@@ -1,7 +1,13 @@
 # Mind Matters: A Data-driven Examination of College Students' Mental Health
 
 ## Description
+This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. By utilizing a data-driven approach, the analysis seeks to provide a comprehensive understanding of the mental health landscape in universities, with a particular focus on psychiatric symptoms, suicidal ideation, and other associated health problems.
 
+The importance of this analysis lies in its potential to uncover hidden patterns and relationships among various factors affecting students' mental health, to better understand their contributions in this issue.
+
+One of the key purposes of this project is to predict whether certain individuals may be at a higher risk of suicidal ideation. This predictive analysis could potentially serve as an early warning system, enabling universities to provide timely intervention and support to those in need.
+
+Furthermore, this project aims to provide actionable insights that can guide the development of more effective mental health policies and support systems within universities. By understanding the specific challenges faced by students, universities can tailor their resources and initiatives to better address these issues, ultimately fostering a healthier, more supportive academic environment.
 
 ## Data
 The information employed for this analysis concerns university students' mental health, including psychiatric symptoms, suicidal ideation, and other associated health problems. This data is accessible under License for scientific purposes ("Scientific Use License"). Further details can be founded within the `LICENSE` document.<br/>

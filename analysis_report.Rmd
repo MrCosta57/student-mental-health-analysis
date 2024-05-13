@@ -3,7 +3,7 @@ title: "Mind Matters: A Data-driven Examination of College Students' Mental Heal
 subtitle: "Statistical Inferecence and Learining project"
 author: "Giovanni Costa - 880892"
 date: "AY 2023/24"
-geometry: "left=3cm,right=3cm,top=1cm,bottom=1cm"
+geometry: "left=1cm,right=2cm,top=1cm,bottom=1cm"
 output:
   html_document:
     toc: true
@@ -26,18 +26,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 # Introduction
+This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. By utilizing a data-driven approach, the analysis seeks to provide a comprehensive understanding of the mental health landscape in universities, with a particular focus on psychiatric symptoms, suicidal ideation, and other associated health problems.
 
-1. **gender**: 0=female, 1=male
+The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a> contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are ordinal variables related to the mental health of the students, where the higher score indicates more serious symptoms:
 
-2. **whether_only_child**: 0=no, 1=yes
+1. **gender**: 0=Female, 1=Male
 
-3. **birth_place**: 0=countryside, 1=town, 2=small_city, 3=medium_to_large_cities
+2. **whether_only_child**: 0=No, 1=Yes
 
-4. **family_economic_status**: 0=extremely_poor, 1=poor, 2=average, 3=good, 4=rich
+3. **birth_place**: 0=Countryside, 1=Town, 2=SmallCity, 3=MediumToLargeCities
 
-5. **major**: 0=liberal, 1=science, 2=art
+4. **family_economic_status**: 0=ExtremelyPoor, 1=Poor, 2=Average, 3=Good, 4=Rich
 
-6. **grade**: 0=postgraduate, 1=undergraduate_grade_five, 2=junior, 3=sophomore, 4=freshman, 5=senior
+5. **major**: 0=Liberal, 1=Science, 2=Art
+
+6. **grade**: 0=Postgraduate, 1=UndergraduateGradeFive, 2=Junior, 3=Sophomore, 4=Freshman, 5=Senior
 
 7. **psychiatric_symptoms**: range from 4 to 16
 
@@ -60,9 +63,36 @@ knitr::opts_chunk$set(echo = TRUE)
 16. **eating_problems**: range from 4 to 16
 
 
+# Prerequirements
+```{r results='hide', message=FALSE, warning=FALSE}
+set.seed(123) # set pseudorandom generator for reprocucibility
+
+# Load all the packages and install them if they are not present
+default_colors <- c("darkorange", "steelblue")
+requirements <- c("summarytools", "dplyr", "car", "effects")
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      install.packages(req)
+  }
+}
+
+# Import user defined functions
+source("utils.R")
+
+# library(styler)
+# style_file("analysis_report.Rmd")
+```
+
+
+# EDA and Data engineering
+
+In this section, exploratory data analysis (EDA) is performed to understand the structure of the dataset and identify any potential issues that need to be addressed. Also, data engineering is applied to transform the variables into the appropriate format.<br/>
+In particular, all the variables are treated as unordered categorical variables for convenience.
 ```{r}
-df <- read.csv("data/mental_health_data.csv", )
-df <- df[, -1]
+# Read the dataset
+df <- read.csv("data/mental_health_data.csv")
+# Remove the column representing the row index
+df <- df[,-1]
 
 # Rename existing columns
 colnames(df)[colnames(df) == "whether.only.child"] <- "whether_only_child"
@@ -75,13 +105,44 @@ colnames(df)[colnames(df) == "hostile.aggression"] <- "hostile_aggression"
 colnames(df)[colnames(df) == "self.injury.behaviors"] <- "self_injury_behaviors"
 colnames(df)[colnames(df) == "eating.problems"] <- "eating_problems"
 
+# Save an in-memory copy of the dataframe
+df_original <- data.frame(df)
+
 # Transforming variables into factors
-df$gender <- factor(df$gender, levels = c(0, 1), labels = c("female", "male"))
-df$whether_only_child <- factor(df$whether_only_child, levels = c(0, 1), labels = c("no", "yes"))
-df$birth_place <- factor(df$birth_place, levels = 0:3, labels = c("countryside", "town", "small_city", "medium_to_large_cities"))
-df$family_economic_status <- factor(df$family_economic_status, levels = 0:4, labels = c("extremely_poor", "poor", "average", "good", "rich"))
-df$major <- factor(df$major, levels = 0:2, labels = c("liberal", "science", "art"))
-df$grade <- factor(df$grade, levels = 0:5, labels = c("postgraduate", "undergraduate_grade_five", "junior", "sophomore", "freshman", "senior"))
+df$gender <- factor(df$gender,
+  levels = c(0, 1),
+  labels = c("Female", "Male")
+)
+df$whether_only_child <- factor(df$whether_only_child,
+  levels = c(0, 1),
+  labels = c("No", "Yes")
+)
+df$birth_place <- factor(
+  df$birth_place,
+  levels = 0:3,
+  labels = c("Countryside", "Town", "SmallCity", "MediumToLargeCities")
+)
+df$family_economic_status <- factor(
+  df$family_economic_status,
+  levels = 0:4,
+  labels = c("ExtremelyPoor", "Poor", "Average", "Good", "Rich")
+)
+df$major <- factor(df$major,
+  levels = 0:2,
+  labels = c("Liberal", "Science", "Art")
+)
+df$grade <- factor(
+  df$grade,
+  levels = 0:5,
+  labels = c(
+    "Postgraduate",
+    "UndergraduateGradeFive",
+    "Junior",
+    "Sophomore",
+    "Freshman",
+    "Senior"
+  )
+)
 df$psychiatric_symptoms <- factor(df$psychiatric_symptoms)
 df$suicide <- factor(df$suicide)
 df$dependence <- factor(df$dependence)
@@ -92,5 +153,92 @@ df$internet_addiction <- factor(df$internet_addiction)
 df$hostile_aggression <- factor(df$hostile_aggression)
 df$self_injury_behaviors <- factor(df$self_injury_behaviors)
 df$eating_problems <- factor(df$eating_problems)
+
+general_cols <- c("gender", "whether_only_child", "birth_place", "family_economic_status", "major", "grade")
+symptoms_cols <- c("psychiatric_symptoms", "dependence", "impulsivity", "compulsion", "sleeping_disturbance", "internet_addiction", "hostile_aggression", "self_injury_behaviors", "eating_problems")
+```
+
+```{r}
+# "Dataset dimensions:"
+dim(df)
+# "N. of missing values:"
+sum(is.na(df))
+# "N. of duplicated rows:"
+sum(duplicated(df))
+#"Example of some objects:"
+head(df, 3)
+```
+
+From the above summary it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to maintain these rows to mantain the original dataset semantics.
+
+Furthermore, given the numerous levels associated with the symptom variables, a decision was made to categorize them into three tiers: "Low", "Medium", and "High". As for the `suicide` variable, it will be converted into a binary variable. This transformation is necessary to frame the problem as a classification task, thereby making the corresponding model more applicable for prediction. Typically, predicting an ordinal response variable would require different models, which are less commonly utilized.
+
+
+It's crucial to mention that in these instances, the partitions are not uniformly distributed, and the split points are determined based on varying criteria:
+
+TODO MODIFY THE CRITERIA HERE
+- For the variable `suicide`, a value within the range [4, 10) corresponds to `FALSE`, while the interval [10, 17) corresponds to `TRUE`. These thresholds are set to align with the data distribution, where the majority of values fall within the first range, which is larger than the second. This approach ensures that only the most severe symptom values are classified as highly serious.
+
+- For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones.
+
+- The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms.
+
+
+```{r}
+reduction_thresholds1<- c(9, 13)
+reduction_thresholds2<- c(11, 16)
+
+# Transforming the variables into factors
+df$suicide <- factor(ifelse(df_original$suicide < 10, "False", "True"), levels = c("False", "True"))
+
+for (col_name in symptoms_cols[-6]){
+  df[[col_name]] <- reduce_df_categories(df_original, col_name, reduction_thresholds1)
+}
+
+df[["internet_addiction"]] <- reduce_df_categories(df_original, "internet_addiction", reduction_thresholds2)
+
+```
+
+```{r}
+print_summary_custom(df)
+```
+
+
+# Exploratory Data Analysis
+```{r}
+par(mfrow=c(1,2))
+
+
+
+par(mfrow=c(1,1))
+```
+
+
+
+
+# Model
+```{r}
+# train <- sample(nrow(df), 0.80*nrow(df))
+# 
+# df_train <- df[train,]
+# df_test <- df[-train,]
+# 
+# # Training split dimension
+# dim(df_train)
+# # Testing split dimension
+# dim(df_test)
+# library(effects)
+
+# mod_zero <- glm(suicide ~ 1, data=df, family="binomial")
+# mod_full <- glm(suicide ~ ., data=df, family="binomial")
+# allEffects((glm(suicide ~ gender +family_economic_status, data=df, family="binomial")))
+
+# residualPlots(mod_zero)
+# qqPlot(residuals(mod_full))
+# influenceIndexPlot(mod_full, vars=c("Cook"))
+# vif(model)
+
+
+#plot(allEffects(mod3), ylab = "Probability of Survival", rescale.axis = FALSE)
 ```
 

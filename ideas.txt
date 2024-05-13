@@ -1,0 +1,3 @@
+Maximize sensitivity (true positive rate)
+EDA on all the data, models just on train
+Try to add jitter for checking patternand deciding interaction terms
