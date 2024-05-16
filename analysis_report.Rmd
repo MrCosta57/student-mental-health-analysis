@@ -68,9 +68,10 @@ The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d
 set.seed(123) # set pseudorandom generator for reprocucibility
 
 # Load all the packages and install them if they are not present
-default_colors <- palette.colors()[2:length(palette.colors())]
-requirements <- c("summarytools", "dplyr", "car", "effects", "stringr", "ggplot2", 
-                  "scales", "pROC", "glmnetUtils", "mgcv", "MASS", "comprehenr")
+default_colors <- palette.colors()[2:length(palette.colors())]  #exclude black color
+requirements <- c("summarytools", "MASS", "car", "effects", "pROC", "glmnetUtils", "mgcv", 
+                  "e1071", "class",
+                  "stringr", "ggplot2", "scales",  "comprehenr", "randomForest", "dplyr")
 for (req in requirements) {
   if (!require(req, character.only = TRUE)) {
     install.packages(req)
@@ -208,21 +209,36 @@ print_summary_custom(df)
 # Exploratory Data Analysis
 
 ## General information
+
 ```{r fig.width=4, fig.height=2}
 for (col_name in general_cols) {
-  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count", default_colors[1])
+  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count [suicide=TRUE]", default_colors[1])
 }
 ```
 
+```{r fig.width=4, fig.height=2}
+for (col_name in general_cols) {
+  plot_counts(df, col_name, "suicide", "False", var_name_to_label(col_name, ""), "Count [suicide=FALSE]", default_colors[1])
+}
+```
 
 ## Symtoms information
 ```{r fig.width=4, fig.height=2}
 for (col_name in symptoms_cols) {
-  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count", default_colors[2])
+  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count [suicide=TRUE]", default_colors[2])
 }
 ```
 
+```{r fig.width=4, fig.height=2}
+for (col_name in symptoms_cols) {
+  plot_counts(df, col_name, "suicide", "False", var_name_to_label(col_name, ""), "Count [suicide=FALSE]", default_colors[2])
+}
+```
 
+## Interaction terms
+```{r}
+plot_interaction_exploration(df_original, "suicide", "psychiatric_symptoms", df, "gender", default_colors, 0.5, var_name_to_label("psychiatric_symptoms"), var_name_to_label("suicide"))
+```
 
 
 
@@ -247,34 +263,127 @@ qqPlot(residuals(mod_full))
 ```
 
 
+## Stepwise regression
 ```{r}
 mod_zero <- glm(suicide ~ 1, data=df_train, family="binomial")
-mod_step <- step(mod_zero, direction = "both", scope=formula(mod_full)) 
+mod_step <- step(mod_zero, direction = "both", scope=formula(mod_full), trace=0) 
 ```
 
+```{r}
+residualPlots(mod_step)
+qqPlot(residuals(mod_step))
+```
 
+## Lasso
 ```{r}
 mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", alpha = 1)
-coef(mod_lasso, s=mod_lasso$lambda.1se)
-
+coef_lasso <- coef(mod_lasso, s=mod_lasso$lambda.1se)
+coeff_lasso_idx <- which(coef_lasso != 0, arr.ind = TRUE)
+print(cbind(coeff_lasso_idx, coef_lasso[coeff_lasso_idx])[,3])
 
 plot(mod_lasso$glmnet.fit, xvar="lambda")
 abline(v = log(mod_lasso$lambda.1se), lty = "dashed")
 
 plot(mod_lasso)
 abline(v = log(mod_lasso$lambda.1se), lty = "dashed")
-
 ```
 
+## LDA
+```{r}
+mod_lda <- lda(suicide~., data=df_train)
+```
+
+
+## QDA
+```{r}
+mod_qda <- qda(suicide~., data=df_train)
+```
+
+## Naive Bayes
+```{r}
+mod_nb <- naiveBayes(suicide~., data = df_train)
+```
+
+
+## KNN
+```{r}
+x.train <- model.matrix(~ ., data=subset(df_train, select = -suicide))[, -1]
+x.test <- model.matrix(~ ., data=subset(df_test, select = -suicide))[, -1]
+
+k_max <- 3
+rates <- double(k_max)
+for (i in 1:k_max) {
+  tmp <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = i)
+  rates[i] <- mean(tmp == df_test$suicide)
+}
+plot(x = (1:k_max), y = rates, xlab = "k", ylab = "Accuracy", type = "l")
+
+best_k <- which.max(rates)
+```
+
+## Random Forest
+```{r}
+mod_rf <- randomForest(suicide ~ ., data=df_train, importance=TRUE, ntree=5)
+print(mod_rf)
+
+plot(mod_rf)
+varImpPlot(mod_rf)
+```
+
+
+
+# Model comparison
 ```{r}
 probs_stepwise <- predict(mod_step, newdata = df_test, type = "response")
 roc_stepwise <- roc(df_test$suicide ~ probs_stepwise, plot = TRUE, print.auc = TRUE)
-coords(roc_stepwise, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+coords_stepwise <- coords(roc_stepwise, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+print(coords_stepwise)
+```
 
-
+```{r}
 probs_lasso <- predict(mod_lasso, newdata = df_test, s = mod_lasso$lambda.1se, type = "response")
 roc_lasso <- roc(df_test$suicide ~ as.vector(probs_lasso), plot = TRUE, print.auc = TRUE)
-coords(roc_lasso, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+coords_lasso <- coords(roc_lasso, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+print(coords_lasso)
+```
+
+```{r}
+probs_lda <- predict(mod_lda, newdata = df_test, )
+roc_lda <- roc(df_test$suicide ~ probs_lda$posterior[, 2], plot = TRUE, print.auc = TRUE)
+coords_lda <- coords(roc_lda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+print(coords_lda)
+```
+
+```{r}
+probs_qda <- predict(mod_qda, newdata = df_test, )
+roc_qda <- roc(df_test$suicide ~ probs_qda$posterior[, 2], plot = TRUE, print.auc = TRUE)
+coords_qda <- coords(roc_qda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+print(coords_qda)
+```
+
+```{r}
+probs_nb <- predict(mod_nb, newdata = df_test, type = "raw")
+roc_nb <- roc(df_test$suicide ~ probs_nb[, 2], plot = TRUE, print.auc = TRUE)
+coords_nb <- coords(roc_nb, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy","tn","tp","fn","fp"))
+print(coords_nb)
+```
+
+```{r}
+probs_knn <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = best_k)
+conf_matrix_knn <- table(df_test$suicide, probs_knn)
+# Calculate True Positives (TP), True Negatives (TN), False Positives (FP), False Negatives (FN)
+TP_knn <- conf_matrix_knn[2, 2]  # True Positives
+TN_knn <- conf_matrix_knn[1, 1]  # True Negatives
+FP_knn <- conf_matrix_knn[1, 2]  # False Positives
+FN_knn <- conf_matrix_knn[2, 1]  # False Negatives
+
+# Specificity (True Negative Rate)
+specificity <- TN_knn / (TN_knn + FP_knn)
+# Sensitivity (Recall or True Positive Rate)
+sensitivity <- TP_knn / (TP_knn + FN_knn)
+# Accuracy
+accuracy <- (TP_knn + TN_knn) / sum(conf_matrix_knn)
+coords_knn <- data.frame(threshold = NA, specificity = specificity, sensitivity = sensitivity, accuracy = accuracy, tn = TN_knn, tp = TP_knn, fn = FN_knn, fp = FP_knn)
 ```
 
 ```{r}
