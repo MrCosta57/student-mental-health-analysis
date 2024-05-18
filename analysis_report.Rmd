@@ -28,7 +28,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # Introduction
 This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. By utilizing a data-driven approach, the analysis seeks to provide a comprehensive understanding of the mental health landscape in universities, with a particular focus on psychiatric symptoms, suicidal ideation, and other associated health problems.
 
-The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a> contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are ordinal variables related to the mental health of the students, where the higher score indicates more serious symptoms:
+The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a> contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are numeric variables related to the mental health of the students, where the higher score indicates more serious symptoms.<br/>
+A detailed description of these features is provided below:
 
 1. **gender**: 0=Female, 1=Male
 
@@ -62,25 +63,25 @@ The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d
 
 16. **eating_problems**: range from 4 to 16
 
+The purposes of this analysis are inspecting the possible hidden patterns present in the data and predicting the risk of observing a suicide, modeled for convenience as a binary variable. 
 
 # Prerequirements
 ```{r results='hide', message=FALSE, warning=FALSE}
 set.seed(123) # set pseudorandom generator for reprocucibility
 
 # Load all the packages and install them if they are not present
-default_colors <- palette.colors()[2:length(palette.colors())]  #exclude black color
-requirements <- c("summarytools", "MASS", "car", "effects", "pROC", "glmnetUtils", "mgcv", 
-                  "e1071", "class",
-                  "stringr", "ggplot2", "scales",  "comprehenr", "randomForest", "dplyr")
-for (req in requirements) {
-  if (!require(req, character.only = TRUE)) {
-    install.packages(req)
+requirements <- c("summarytools", "MASS", "effects", "pROC", "mgcv", 
+                  "glmnetUtils", "e1071", "class",
+                  "stringr", "ggplot2", "reshape2", "scales",  "comprehenr", "randomForest", "dplyr")
+
+for (library_name in requirements){
+  if (!require(library_name, character.only = TRUE)) {
+    install.packages(library_name, repos = "https://cloud.r-project.org")
+    library(library_name, character.only = TRUE)
   }
 }
-
 # Import user defined functions
 source("utils.R")
-
 # library(styler)
 # style_file("analysis_report.Rmd")
 ```
@@ -88,8 +89,7 @@ source("utils.R")
 
 # First overview and data engineering
 
-In this section, exploratory data analysis (EDA) is performed to understand the structure of the dataset and identify any potential issues that need to be addressed. Also, data engineering is applied to transform the variables into the appropriate format.<br/>
-In particular, all the variables are treated as unordered categorical variables for convenience.
+In this section, exploratory data analysis (EDA) is performed to understand the structure of the dataset and identify any potential issues that need to be addressed. Also, data engineering is applied to transform the variables into the appropriate format.
 ```{r}
 # Read the dataset
 df <- read.csv("data/mental_health_data.csv")
@@ -107,8 +107,6 @@ colnames(df)[colnames(df) == "hostile.aggression"] <- "hostile_aggression"
 colnames(df)[colnames(df) == "self.injury.behaviors"] <- "self_injury_behaviors"
 colnames(df)[colnames(df) == "eating.problems"] <- "eating_problems"
 
-# Save an in-memory copy of the dataframe
-df_original <- data.frame(df)
 
 # Transforming variables into factors
 df$gender <- factor(df$gender,
@@ -145,19 +143,13 @@ df$grade <- factor(
     "Senior"
   )
 )
-df$psychiatric_symptoms <- factor(df$psychiatric_symptoms)
-df$suicide <- factor(df$suicide)
-df$dependence <- factor(df$dependence)
-df$impulsivity <- factor(df$impulsivity)
-df$compulsion <- factor(df$compulsion)
-df$sleeping_disturbance <- factor(df$sleeping_disturbance)
-df$internet_addiction <- factor(df$internet_addiction)
-df$hostile_aggression <- factor(df$hostile_aggression)
-df$self_injury_behaviors <- factor(df$self_injury_behaviors)
-df$eating_problems <- factor(df$eating_problems)
 
 general_cols <- c("gender", "whether_only_child", "birth_place", "family_economic_status", "major", "grade")
 symptoms_cols <- c("psychiatric_symptoms", "dependence", "impulsivity", "compulsion", "sleeping_disturbance", "internet_addiction", "hostile_aggression", "self_injury_behaviors", "eating_problems")
+```
+
+```{r}
+print_summary_custom(df)
 ```
 
 ```{r}
@@ -171,75 +163,90 @@ sum(duplicated(df))
 head(df, 3)
 ```
 
-From the above summary it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to maintain these rows to mantain the original dataset semantics.
+From the above summary it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to keep these rows to mantain the original dataset semantics.
 
-Furthermore, given the numerous levels associated with the symptom variables, a decision was made to categorize them into three tiers: "Low", "Medium", and "High". As for the `suicide` variable, it will be converted into a binary variable. This transformation is necessary to frame the problem as a classification task, thereby making the corresponding model more applicable for prediction. Typically, predicting an ordinal response variable would require different models, which are less commonly utilized.
-
-
-It's crucial to mention that in these instances, the partitions are not uniformly distributed, and the split points are determined based on varying criteria:
-
-TODO MODIFY THE CRITERIA HERE
-- For the variable `suicide`, a value within the range [4, 10) corresponds to `FALSE`, while the interval [10, 17) corresponds to `TRUE`. These thresholds are set to align with the data distribution, where the majority of values fall within the first range, which is larger than the second. This approach ensures that only the most severe symptom values are classified as highly serious.
-
-- For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones.
-
-- The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms.
-
+5 is the value of the 5 3rd quantile, 8 is more extreme and seems reasonable because we want to take into account just more serious symptoms
 
 ```{r}
-reduction_thresholds1 <- c(9, 13)
-reduction_thresholds2 <- c(11, 16)
+numeric_suicide <- df$suicide
+scaled_suicide <- numeric_suicide - min(numeric_suicide)
+factor_suicide <- as.factor(df$suicide>8)
 
-# Transforming the variables into factors
-df$suicide <- factor(ifelse(df_original$suicide < 10, "False", "True"), levels = c("False", "True"))
-
-# Reduce the number of categories for the symptoms variables (except "internet_addiction")
-for (col_name in symptoms_cols[-6]) {
-  df[[col_name]] <- reduce_df_categories(df_original, col_name, reduction_thresholds1)
-}
-
-df[["internet_addiction"]] <- reduce_df_categories(df_original, "internet_addiction", reduction_thresholds2)
-```
-
-```{r}
-print_summary_custom(df)
+df$suicide <- factor_suicide
 ```
 
 
 # Exploratory Data Analysis
 
-## General information
-
-```{r fig.width=4, fig.height=2}
-for (col_name in general_cols) {
-  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count [suicide=TRUE]", default_colors[1])
+## Frequency
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+for (col in general_cols){
+  plot_freq_by_category(df, col, "suicide")
 }
 ```
 
-```{r fig.width=4, fig.height=2}
-for (col_name in general_cols) {
-  plot_counts(df, col_name, "suicide", "False", var_name_to_label(col_name, ""), "Count [suicide=FALSE]", default_colors[1])
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+for (col in symptoms_cols){
+  plot_freq_by_category(df, col, "suicide")
 }
 ```
 
-## Symtoms information
-```{r fig.width=4, fig.height=2}
-for (col_name in symptoms_cols) {
-  plot_counts(df, col_name, "suicide", "True", var_name_to_label(col_name, ""), "Count [suicide=TRUE]", default_colors[2])
-}
-```
 
-```{r fig.width=4, fig.height=2}
-for (col_name in symptoms_cols) {
-  plot_counts(df, col_name, "suicide", "False", var_name_to_label(col_name, ""), "Count [suicide=FALSE]", default_colors[2])
-}
+## Numeric variables
+```{r}
+cor_matrix <- cor(df[, symptoms_cols])   # Calculate correlations
+melted_cor_matrix <- melt(cor_matrix)  # Reshape for ggplot2
+
+ggplot(data = melted_cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), name = "Pearson\nCorrelation") +
+  labs(title = "Heatmap of Correlation Matrix") +   # Add title
+  theme_minimal() +
+  theme(
+    axis.title.x = element_blank(),              # Remove x-axis title
+    axis.title.y = element_blank(),              # Remove y-axis title
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),  # Adjust x-axis text
+    plot.title = element_text(hjust = 0.5)  # Center the title
+  ) +
+  coord_fixed()
 ```
 
 ## Interaction terms
 ```{r}
-plot_interaction_exploration(df_original, "suicide", "psychiatric_symptoms", df, "gender", default_colors, 0.5, var_name_to_label("psychiatric_symptoms"), var_name_to_label("suicide"))
+df$suicide <- numeric_suicide
 ```
 
+```{r message=FALSE, warning=FALSE}
+ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE, aes(group = gender)) +
+  labs(title = "Suicide vs psychiatric symptoms by gender interaction",
+       x = "Psychiatric symptoms",
+       y = "Suicide")
+```
+
+```{r message=FALSE, warning=FALSE}
+ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE, aes(group = family_economic_status)) +
+  labs(title = "Suicide vs eating problems by family economic status interaction",
+       x = "Eating problems",
+       y = "Suicide")
+
+```
+
+```{r message=FALSE, warning=FALSE}
+ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE, aes(group = major)) +
+  labs(title = "Suicide vs sleeping disturbance by major interaction",
+       x = "Sleeping disturbance",
+       y = "Suicide")
+```
+
+```{r}
+df$suicide <- factor_suicide
+```
 
 
 # Models developement
@@ -252,34 +259,34 @@ df_test <- df[-idx,]
 dim(df_train)
 # Testing split dimension
 dim(df_test)
+```
 
+```{r}
 mod_full <- glm(suicide ~ ., data=df_train, family="binomial")
 summary(mod_full)
 ```
 
+## Manual selection
 ```{r}
-residualPlots(mod_full)
-qqPlot(residuals(mod_full))
-```
+mod_manual <- glm(suicide ~ family_economic_status + psychiatric_symptoms +impulsivity +self_injury_behaviors, data=df_train, family="binomial")
+summary(mod_manual)
 
+```
 
 ## Stepwise regression
 ```{r}
 mod_zero <- glm(suicide ~ 1, data=df_train, family="binomial")
-mod_step <- step(mod_zero, direction = "both", scope=formula(mod_full), trace=0) 
+mod_step <- stepAIC(mod_zero, direction = "both", scope = list(upper = formula(mod_full)), trace=0)
+summary(mod_step)
 ```
 
-```{r}
-residualPlots(mod_step)
-qqPlot(residuals(mod_step))
-```
 
 ## Lasso
 ```{r}
 mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", alpha = 1)
-coef_lasso <- coef(mod_lasso, s=mod_lasso$lambda.1se)
-coeff_lasso_idx <- which(coef_lasso != 0, arr.ind = TRUE)
-print(cbind(coeff_lasso_idx, coef_lasso[coeff_lasso_idx])[,3])
+coef_lasso <- coef(mod_lasso, s=mod_lasso$lambda.1se)[,1]
+coeff_lasso_idx <- which(coef_lasso != 0)
+print(cbind(coeff_lasso_idx, coef_lasso[coeff_lasso_idx])[,2])
 
 plot(mod_lasso$glmnet.fit, xvar="lambda")
 abline(v = log(mod_lasso$lambda.1se), lty = "dashed")
@@ -331,6 +338,22 @@ varImpPlot(mod_rf)
 ```
 
 
+## Different model definition
+```{r}
+# FOR LATER
+df$scaled_suicide <- scaled_suicide
+df <- subset(df, select=-suicide)
+df_train <- df[idx,]
+df_test <- df[-idx,]
+mod_test <- glm(cbind(scaled_suicide, (max(scaled_suicide) - scaled_suicide)) ~
+             .,
+           family = "binomial",
+           data = df_train)
+table(
+ preds = predict(mod_test, newdata = df_test, type = "response"),
+ true = df_test$scaled_suicide
+)
+```
 
 # Model comparison
 ```{r}
@@ -385,6 +408,7 @@ sensitivity <- TP_knn / (TP_knn + FN_knn)
 accuracy <- (TP_knn + TN_knn) / sum(conf_matrix_knn)
 coords_knn <- data.frame(threshold = NA, specificity = specificity, sensitivity = sensitivity, accuracy = accuracy, tn = TN_knn, tp = TP_knn, fn = FN_knn, fp = FP_knn)
 ```
+
 
 ```{r}
 # allEffects((glm(suicide ~ gender +family_economic_status, data=df, family="binomial")))

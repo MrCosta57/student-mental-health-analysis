@@ -1,3 +1,37 @@
+# Questions
+
+1) How to display categorical data? (talk about the proposed plot)
+ -> try tables (mosaicplot) 3x3 con aggregazioni da 4 a 8 etc
+3) Residual plot for categorical data seems bad always
+2) How to check assumption on LDA/QDA? Use entropy?
+3) Can I use non linear models? (probably not due to all categories)
+4) Can I add numerical predictors? (use ordinal variables as numbers starting from 0?) 
+
+
 Maximize sensitivity (true positive rate)
-EDA on all the data, models just on train
-Try to add jitter for checking patternand deciding interaction terms
+
+binamial ditrib con dim 10 (scaling data, e.g if they are from 6,16 --> 0,10) for response (glm with 2col [score, 10-score]~x1+x2+.. ) --> glm(cbind(score, 10-score)~x1+x2+.., family=binomial) #logistic regr for response
+or lin regr for interpreting the coefficients
+
+Compare w.r.t naive pred that use only the freq of the predictors
+(es sum of error etc)
+
+
+Aggregate if too few observation for some classes
+model Beta
+
+
+
+# TODO
+
+Furthermore, given the numerous levels associated with the symptom variables, a decision was made to categorize them into three tiers: "Low", "Medium", and "High". As for the `suicide` variable, it will be converted into a binary variable. This transformation is necessary to frame the problem as a classification task, thereby making the corresponding model more applicable for prediction. Typically, predicting an ordinal response variable would require different models, which are less commonly utilized.
+
+
+It's crucial to mention that in these instances, the partitions are not uniformly distributed, and the split points are determined based on varying criteria:
+
+TODO MODIFY THE CRITERIA HERE
+- For the variable `suicide`, a value within the range [4, 10) corresponds to `FALSE`, while the interval [10, 17) corresponds to `TRUE`. These thresholds are set to align with the data distribution, where the majority of values fall within the first range, which is larger than the second. This approach ensures that only the most severe symptom values are classified as highly serious.
+
+- For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones.
+
+- The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms.
