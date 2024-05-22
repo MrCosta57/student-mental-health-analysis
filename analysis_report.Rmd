@@ -26,41 +26,30 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 # Introduction
-This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. By utilizing a data-driven approach, the analysis seeks to provide a comprehensive understanding of the mental health landscape in universities, with a particular focus on psychiatric symptoms, suicidal ideation, and other associated health problems.
+This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. By utilizing a data-driven approach, the analysis seeks to provide a comprehensive understanding of the mental health landscape in universities, with a particular focus on psychiatric symptoms and other associated health problems.
 
-The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a> contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are numeric variables related to the mental health of the students, where the higher score indicates more serious symptoms.<br/>
-A detailed description of these features is provided below:
+One of the key purposes of this project is to predict whether certain individuals may be at a higher risk of suicidal ideation. This predictive analysis could potentially serve as an early warning system, enabling universities to provide timely intervention and support to those in need.
+
+Furthermore, this project aims to provide actionable insights that can guide the development of more effective mental health policies and support systems within universities. By understanding the specific challenges faced by students, universities can tailor their resources and initiatives to better address these issues, ultimately fostering a healthier, more supportive academic environment.
+
+The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a> contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are numeric variables related to the mental health of the students, where the higher score indicates more serious symptoms. Additional details regarding the data scales, where the data comes from and the methodology for retrieving them are not provided by the dataset website.<br/>
+A specific description of these features is provided below:
 
 1. **gender**: 0=Female, 1=Male
-
 2. **whether_only_child**: 0=No, 1=Yes
-
 3. **birth_place**: 0=Countryside, 1=Town, 2=SmallCity, 3=MediumToLargeCities
-
 4. **family_economic_status**: 0=ExtremelyPoor, 1=Poor, 2=Average, 3=Good, 4=Rich
-
 5. **major**: 0=Liberal, 1=Science, 2=Art
-
 6. **grade**: 0=Postgraduate, 1=UndergraduateGradeFive, 2=Junior, 3=Sophomore, 4=Freshman, 5=Senior
-
 7. **psychiatric_symptoms**: range from 4 to 16
-
 8. **suicide**: range from 4 to 16
-
 9. **dependence**: range from 4 to 16
-
-10. **impulsivity**: range from 4 to 16                                                         
-
+10. **impulsivity**: range from 4 to 16
 11. **compulsion**: range from 4 to 16
-
 12. **sleeping_disturbance**: range from 4 to 16
-
 13. **internet_addiction**: range from 5 to 20
-
 14. **hostile_aggression**: range from 4 to 16
-
 15. **self_injury_behaviors:** range from 4 to 16
-
 16. **eating_problems**: range from 4 to 16
 
 The purposes of this analysis are inspecting the possible hidden patterns present in the data and predicting the risk of observing a suicide, modeled for convenience as a binary variable. 
@@ -163,20 +152,37 @@ sum(duplicated(df))
 head(df, 3)
 ```
 
-From the above summary it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to keep these rows to mantain the original dataset semantics.
+From the above table it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to keep these rows to mantain the original dataset semantics.
 
-5 is the value of the 5 3rd quantile, 8 is more extreme and seems reasonable because we want to take into account just more serious symptoms
+Talking about the summary of the dataset different aspects can be observed:
+
+- The majority of the students are female (67.5\%)
+- A lot of person have at least one brother or sisters (72.8\%)
+- Less students in the dataset are from Medium to Large Cities (10.2\%)
+- The number of students with average family economic status is the highest (66.8\%), instead the number of students with rich family it quite low (0.4\%)
+- The most common major is Liberal (58.5\%)
+- Only 0.3\% of the person are undergraduate with grade five, instead the other grades are quite equally distributed
+- The mean value of the variable Internet addiction is near 10 (scale [5, 20]) while the means for sleeping disturbance, impulsivity, compulsion, dependence are around 7 (scale [4, 16]). These symptoms scores are a bit higher with respect to the other variables values
+- No peoples with self-injury behaviors has symptoms of value 15 and they have the lowest average score (4.82), suggesting it might be the least prevalent issue
+- In general the students with high severity in symptoms are fortunately extremely low so symptoms distribution is right skewed
+
+
+For convenience, in this analysis it's decided to transform the variable *suicide* in a binary feature, considering the current problem as a classification task.<br/>
+In this sense, the values of *suicide* lower or equal to 8 take the value FALSE, instead the other take the value TRUE. The choice of this threshold is considered reasonable because the purpose of this analysis is to consider higher severity of suicide but at the same time don't underestimate the risk even if the value of severity is not too high.
+
 
 ```{r}
+print(summary(df$suicide))
+
 numeric_suicide <- df$suicide
 scaled_suicide <- numeric_suicide - min(numeric_suicide)
 factor_suicide <- as.factor(df$suicide>8)
-
 df$suicide <- factor_suicide
 ```
 
 
 # Exploratory Data Analysis
+After a first overview of the data it's needed to inspect some possible relations and hidden pattern between the variables. Some guessed interaction terms are also checked.
 
 ## Frequency
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
@@ -185,12 +191,30 @@ for (col in general_cols){
 }
 ```
 
+Looking at the bar plots referring to the general information about the students, it seems that there are no strange relationship between the categories and the values of the frequencies for the variable *suicide*: in particular the higher number of suicide for a categorical level is usually related with the higher number of person in that level.
+Just for the grade *Freshmen* the number of positive suicide in higher than the other levels, and in particular there are less suicide for lower grading.
+
+Grade variable it's possibly related to some age information that in the dataframe is not present. 
+
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
 for (col in symptoms_cols){
   plot_freq_by_category(df, col, "suicide")
 }
 ```
 
+The histograms of the symptoms features instead show a slightly different behavior.
+
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+for (col in general_cols){
+  plot_proportion_by_category(df, col, "suicide")
+}
+```
+
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+for (col in symptoms_cols){
+  plot_proportion_by_category(df, col, "suicide")
+}
+```
 
 ## Numeric variables
 ```{r}
@@ -342,9 +366,8 @@ varImpPlot(mod_rf)
 ```{r}
 # FOR LATER
 df$scaled_suicide <- scaled_suicide
-df <- subset(df, select=-suicide)
-df_train <- df[idx,]
-df_test <- df[-idx,]
+df_train <- subset(df, select=-suicide)[idx,]
+df_test <- subset(df, select=-suicide)[-idx,]
 mod_test <- glm(cbind(scaled_suicide, (max(scaled_suicide) - scaled_suicide)) ~
              .,
            family = "binomial",
@@ -353,6 +376,9 @@ table(
  preds = predict(mod_test, newdata = df_test, type = "response"),
  true = df_test$scaled_suicide
 )
+df$scaled_suicide <- NULL
+df_train <- df[idx,]
+df_test <- df[-idx,]
 ```
 
 # Model comparison
