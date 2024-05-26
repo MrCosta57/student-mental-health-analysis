@@ -15,11 +15,15 @@ print_summary_custom <- function(df) {
 }
 
 var_name_to_label <- function(var_name, end_text = "score") {
-  return(paste(str_to_title(str_replace_all(var_name, "_", " ")), end_text, sep =
+  return(paste(str_to_sentence(str_replace_all(var_name, "_", " ")), end_text, sep =
                  if (end_text != "")
                    " "
                else
                  ""))
+}
+
+var_name_to_intitle <- function(var_name) {
+  return(paste(str_replace_all(var_name, "_", " "), sep = " "))
 }
 
 
@@ -67,9 +71,9 @@ plot_freq_by_category <- function(data, freq_var, binary_category) {
     labs(
       title = paste(
         "Frequency of",
-        pred_label,
+        var_name_to_intitle(freq_var),
         "by",
-        binary_category,
+        var_name_to_intitle(binary_category),
         "values",
         sep = " "
       ),
@@ -123,9 +127,9 @@ plot_proportion_by_category <- function(data, freq_var, binary_category) {
     labs(
       title = paste(
         "Percentage of",
-        pred_label,
+        var_name_to_intitle(freq_var),
         "by",
-        binary_category,
+        var_name_to_intitle(binary_category),
         "values",
         sep = " "
       ),

@@ -61,7 +61,8 @@ set.seed(123) # set pseudorandom generator for reprocucibility
 # Load all the packages and install them if they are not present
 requirements <- c("summarytools", "MASS", "effects", "pROC", "mgcv", 
                   "glmnetUtils", "e1071", "class",
-                  "stringr", "ggplot2", "reshape2", "scales",  "comprehenr", "randomForest", "dplyr")
+                  "stringr", "ggplot2", "reshape2", "scales",  "comprehenr", 
+                  "randomForest", "dplyr", "ggcorrplot")
 
 for (library_name in requirements){
   if (!require(library_name, character.only = TRUE)) {
@@ -164,7 +165,7 @@ Talking about the summary of the dataset different aspects can be observed:
 - Only 0.3\% of the person are undergraduate with grade five, instead the other grades are quite equally distributed
 - The mean value of the variable Internet addiction is near 10 (scale [5, 20]) while the means for sleeping disturbance, impulsivity, compulsion, dependence are around 7 (scale [4, 16]). These symptoms scores are a bit higher with respect to the other variables values
 - No peoples with self-injury behaviors has symptoms of value 15 and they have the lowest average score (4.82), suggesting it might be the least prevalent issue
-- In general the students with high severity in symptoms are fortunately extremely low so symptoms distribution is right skewed
+- In general students with very high symptoms are fortunately the minority among the observed data sample, so the numeric distribution is right skewed.
 
 
 For convenience, in this analysis it's decided to transform the variable *suicide* in a binary feature, considering the current problem as a classification task.<br/>
@@ -178,13 +179,17 @@ numeric_suicide <- df$suicide
 scaled_suicide <- numeric_suicide - min(numeric_suicide)
 factor_suicide <- as.factor(df$suicide>8)
 df$suicide <- factor_suicide
+
+print(summary(df$suicide))
 ```
 
 
 # Exploratory Data Analysis
 After a first overview of the data it's needed to inspect some possible relations and hidden pattern between the variables. Some guessed interaction terms are also checked.
 
-## Frequency
+## Frequencies with respect to response variable
+
+### General information columns
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
 for (col in general_cols){
   plot_freq_by_category(df, col, "suicide")
@@ -192,17 +197,8 @@ for (col in general_cols){
 ```
 
 Looking at the bar plots referring to the general information about the students, it seems that there are no strange relationship between the categories and the values of the frequencies for the variable *suicide*: in particular the higher number of suicide for a categorical level is usually related with the higher number of person in that level.
-Just for the grade *Freshmen* the number of positive suicide in higher than the other levels, and in particular there are less suicide for lower grading.
+Just for the grade *Freshmen* the number of suicide is higher than the other levels, and in particular there are less suicide for lower grading. Grade variable it's possibly related to some age information that in the dataframe is not present and it could suggest that yunger person are less prone to suicide. 
 
-Grade variable it's possibly related to some age information that in the dataframe is not present. 
-
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
-for (col in symptoms_cols){
-  plot_freq_by_category(df, col, "suicide")
-}
-```
-
-The histograms of the symptoms features instead show a slightly different behavior.
 
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
 for (col in general_cols){
@@ -210,32 +206,79 @@ for (col in general_cols){
 }
 ```
 
+The plots above regarding the proportions of students for each category divided by suidice response values instead highlight interesting patterns: indeed it's more clear to understand the relationships by these plots that consider the ratios and not the frequencies because the y scale is large.
+
+There are few visible things by this visualization:
+
+- The relative difference in suicide frequency considering the *gender* seems not so significant based on these data, instead the gap is more noticeable compared with *whether only child*
+- It seems that the percentage of suicide in *Medium to Large cities* is higher.
+- Being in a rich family lead to higher proportion of suicide based on this dataset
+- Attempting the Liberal or the Art major have similar suicide ratio and this is higher with respect to science courses
+- As observed before the percentage of positive values in the response variable is higher for freshman category 
+
+
+### Symptoms information columns
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+for (col in symptoms_cols){
+  plot_freq_by_category(df, col, "suicide")
+}
+```
+
+The histograms of the symptoms features show a slightly different behavior compared with the other categorical predictors. As observed in the beginning the number of high serverity symptoms in general is low but the frequency of suicide get bigger when these symptoms increase (compulsion, internet addition, sleeping disturbance)
+
+
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
 for (col in symptoms_cols){
   plot_proportion_by_category(df, col, "suicide")
 }
 ```
 
+
+Checking the proportion histograms divided by the response variable what stated in the previously becomes more evident: now it can be seen noticeable increasing trend in the suicide ratios when the symtoms severity increases and in particular the percentage are higher for the variables psyciatric symptoms, hostile aggression, self-injury behaviours and eating problems, even if the frequency of the higher symtoms for them is quite low (except for compulsion)
+
+
 ## Numeric variables
 ```{r}
-cor_matrix <- cor(df[, symptoms_cols])   # Calculate correlations
-melted_cor_matrix <- melt(cor_matrix)  # Reshape for ggplot2
-
-ggplot(data = melted_cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), name = "Pearson\nCorrelation") +
-  labs(title = "Heatmap of Correlation Matrix") +   # Add title
-  theme_minimal() +
-  theme(
-    axis.title.x = element_blank(),              # Remove x-axis title
-    axis.title.y = element_blank(),              # Remove y-axis title
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),  # Adjust x-axis text
-    plot.title = element_text(hjust = 0.5)  # Center the title
-  ) +
-  coord_fixed()
+corr_matrix <- round(cor(df[, symptoms_cols]), 2)
+ggcorrplot(corr_matrix, 
+           hc.order = TRUE, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3,
+           colors = c("#6D9EC1", "white", "#E46726"), 
+           title="Pearson correlation", 
+           ggtheme=theme_minimal()+ 
+             theme(plot.title = element_text(hjust = 0.5)))
 ```
 
+The heatmap of the correlation matrix shows that all the variables are quite highly positive correlated with each other. By the plot can be seen that the most correlated variables are *impulsivity* and *compulsion* (0.72), *dependence* and *impulsivity* (0.71), *dependence* and *compulsion* (0.68). Also *self-injury behaviours* and *eating problems* seems to be correlated in a significant way (0.66).
+
+Correlation coefficient significance test is performed to check if for these features correlation is statistically significant. The formula for the t-statistic is: 
+$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$
+```{r}
+cor.test(df$impulsivity, df$compulsion)
+cor.test(df$dependence, df$impulsivity)
+cor.test(df$dependence, df$compulsion)
+cor.test(df$self_injury_behaviors, df$eating_problems)
+cor.test(df$self_injury_behaviors, df$internet_addiction)
+```
+
+The p-values for the correlation tests are all very close to zero, indicating that the correlations are statistically significant.
+However, this information it's not fully considered because numeric variables have all positive variables and they are almost all in the same scale.
+
+
 ## Interaction terms
+Just for better understanding the possible interaction between the variables, some scatter plots are drawn to check if there are some evident patterns that can be useful for the model development. For this purpose, the response variable is considered again as a numeric variable and a line is fitted for highlight the linear relation between variables divided by categories.
+
+In particular the following interactions are considered:
+
+- **Psychiatric symptoms and gender**: It's important  to inspect these variables because psychiatric conditions often manifest differently across genders, potentially leading to gender-specific patterns in symptoms and treatment outcomes.
+
+- **Eating problems and family economic status**: Economic factors can affect access to resources and support for managing eating problems, influencing the severity and consequences of these issues in different socioeconomic groups.
+
+- **Sleeping disturbance and major**: Different majors may have varying stress levels and workload demands, which can interact with sleep disturbances to affect academic performance and mental health uniquely in each field of study.
+
+- **Hostile aggression and birth place**: Cultural norms around aggression and conflict resolution can vary significantly by location, impacting how hostile aggression influences social relationships and legal issues in different birthplaces.
 ```{r}
 df$suicide <- numeric_suicide
 ```
@@ -268,10 +311,20 @@ ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
        y = "Suicide")
 ```
 
+```{r message=FALSE, warning=FALSE}
+ggplot(df, aes(x = hostile_aggression, y = suicide, color = birth_place)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE, aes(group = birth_place)) +
+  labs(title = "Suicide vs hostile_aggression by birth_place interaction",
+       x = "Birth place",
+       y = "Suicide")
+```
+
 ```{r}
 df$suicide <- factor_suicide
 ```
 
+For these data, it seems that just the interaction between *eating problems and family economic status* and *sleeping disturbance and major* is relevant.
 
 # Models developement
 ```{r}
@@ -296,6 +349,9 @@ mod_manual <- glm(suicide ~ family_economic_status + psychiatric_symptoms +impul
 summary(mod_manual)
 
 ```
+
+
+## Category aggregation
 
 ## Stepwise regression
 ```{r}
