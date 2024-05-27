@@ -34,13 +34,13 @@ split_camel_case <- function(input_string) {
 }
 
 
-reduce_df_categories <- function(df_src, col_name, thresholds) {
+reduce_df_categories_to3 <- function(df_src, col_name, thresholds, levels) {
   res <- factor(ifelse(
     df_src[[col_name]] < thresholds[1],
-    "Low",
-    ifelse(df_src[[col_name]] < thresholds[2], "Medium", "High")
+    levels[1],
+    ifelse(df_src[[col_name]] < thresholds[2], levels[2], levels[3])
   ),
-  levels = c("Low", "Medium", "High"))
+  levels = levels)
   return(res)
 }
 

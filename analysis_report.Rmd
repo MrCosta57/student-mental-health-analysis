@@ -55,7 +55,7 @@ A specific description of these features is provided below:
 The purposes of this analysis are inspecting the possible hidden patterns present in the data and predicting the risk of observing a suicide, modeled for convenience as a binary variable. 
 
 # Prerequirements
-```{r results='hide', message=FALSE, warning=FALSE}
+```{r results='FALSE', message=FALSE, warning=FALSE}
 set.seed(123) # set pseudorandom generator for reprocucibility
 
 # Load all the packages and install them if they are not present
@@ -190,7 +190,7 @@ After a first overview of the data it's needed to inspect some possible relation
 ## Frequencies with respect to response variable
 
 ### General information columns
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in general_cols){
   plot_freq_by_category(df, col, "suicide")
 }
@@ -200,7 +200,7 @@ Looking at the bar plots referring to the general information about the students
 Just for the grade *Freshmen* the number of suicide is higher than the other levels, and in particular there are less suicide for lower grading. Grade variable it's possibly related to some age information that in the dataframe is not present and it could suggest that yunger person are less prone to suicide. 
 
 
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in general_cols){
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -218,7 +218,7 @@ There are few visible things by this visualization:
 
 
 ### Symptoms information columns
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in symptoms_cols){
   plot_freq_by_category(df, col, "suicide")
 }
@@ -227,7 +227,7 @@ for (col in symptoms_cols){
 The histograms of the symptoms features show a slightly different behavior compared with the other categorical predictors. As observed in the beginning the number of high serverity symptoms in general is low but the frequency of suicide get bigger when these symptoms increase (compulsion, internet addition, sleeping disturbance)
 
 
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in symptoms_cols){
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -238,7 +238,7 @@ Checking the proportion histograms divided by the response variable what stated 
 
 
 ## Numeric variables
-```{r}
+```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 corr_matrix <- round(cor(df[, symptoms_cols]), 2)
 ggcorrplot(corr_matrix, 
            hc.order = TRUE, 
@@ -254,7 +254,9 @@ ggcorrplot(corr_matrix,
 The heatmap of the correlation matrix shows that all the variables are quite highly positive correlated with each other. By the plot can be seen that the most correlated variables are *impulsivity* and *compulsion* (0.72), *dependence* and *impulsivity* (0.71), *dependence* and *compulsion* (0.68). Also *self-injury behaviours* and *eating problems* seems to be correlated in a significant way (0.66).
 
 Correlation coefficient significance test is performed to check if for these features correlation is statistically significant. The formula for the t-statistic is: 
-$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$
+
+$$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$$
+where \(r\) is the correlation coefficient and \(n\) is the number of observations. The null hypothesis is that the correlation coefficient is equal to zero, and the alternative hypothesis is that the correlation coefficient is not equal to zero. The degrees of freedom for the t-distribution are \(n-2\). The p-value is calculated as the probability of observing a t-statistic as extreme as the one calculated from the data, assuming the null hypothesis is true.
 ```{r}
 cor.test(df$impulsivity, df$compulsion)
 cor.test(df$dependence, df$impulsivity)
@@ -283,7 +285,7 @@ In particular the following interactions are considered:
 df$suicide <- numeric_suicide
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, echo=FALSE}
 ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE, aes(group = gender)) +
@@ -292,7 +294,7 @@ ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
        y = "Suicide")
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, echo=FALSE}
 ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE, aes(group = family_economic_status)) +
@@ -302,7 +304,7 @@ ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)
 
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, echo=FALSE}
 ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE, aes(group = major)) +
@@ -311,7 +313,7 @@ ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
        y = "Suicide")
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, echo=FALSE}
 ggplot(df, aes(x = hostile_aggression, y = suicide, color = birth_place)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE, aes(group = birth_place)) +
@@ -327,6 +329,12 @@ df$suicide <- factor_suicide
 For these data, it seems that just the interaction between *eating problems and family economic status* and *sleeping disturbance and major* is relevant.
 
 # Models developement
+In a statistical analysis, splitting data into training and testing sets is crucial for model development. This process allows us to build the model using the training set and then evaluate its performance on the unseen testing set. The hyperparameter tuning where required is instead performed by cross validation on the training partition. This it's needed to check if the model generalizes well to new data and provides an unbiased estimate of its predictive accuracy.
+
+The reference level for the categorical predictors in a full model is a female student with brothers/sisters, from the countryside with extremely poor family, liberal major and postgraduate.
+
+The coefficients in this case represent the log-odds increment/decrement of the outcome (suicide) for a one-unit increase in the predictor variable, holding all other variables constant. A positive coefficient indicates an increase in the log-odds of suicide, while a negative coefficient indicates a decrease.
+
 ```{r}
 idx <- sample(nrow(df), 0.80*nrow(df))
 df_train <- df[idx,]
@@ -336,6 +344,11 @@ df_test <- df[-idx,]
 dim(df_train)
 # Testing split dimension
 dim(df_test)
+
+# Reference levels
+for (i in general_cols){
+  print(paste0(i, ": ", levels(df[,i])[1], sep=""))
+}
 ```
 
 ```{r}
@@ -343,15 +356,47 @@ mod_full <- glm(suicide ~ ., data=df_train, family="binomial")
 summary(mod_full)
 ```
 
+Examining the model that includes all the variables, several predictors appear to be strongly significant. Notably, the intercept, which corresponds to the reference level and numeric predictors with coefficients of 0, has a log-odds value of `r mod_full$coefficients[1]`. When converted, this log-odds value represents a probability of `r exp(mod_full$coefficients[1])/(1-exp(mod_full$coefficients[1])` for the response variable $\mathcal{P}(suicide)=\frac{e^{\beta_0}}{1+e^{\beta_0}}$.
+
+In particular the following model interpretation is considered:
+
+- Being male decreases the log-odds of suicide compared to being female. This suggests that males are less likely to report suicidal tendencies than females in this dataset
+- Students from towns, small cities, and medium to large cities have higher log-odds of suicide compared to students from rural areas. This indicates that urbanization might be associated with higher suicidal tendencies.
+- Being a science major decreases the log-odds of suicide compared to the reference category
+- Freshmen grade has the highest value for the coefficient and it's strongly significant.
+- All the symptoms predictor are significant of strongly significant except for eating_problems. Higher levels of psychiatric symptoms, impulsivity, compulsion, sleeping disturbances, internet addiction, hostile aggression, and self-injury behaviors are associated with increased log-odds of suicide. Dependence, however, shows a negative relationship, suggesting that higher dependence decreases the log-odds of suicide for these data.
+
+
 ## Manual selection
+
+Given the available information, an attempt in developing a model manually is proposed.
+Specifically, ....
+model 1 contains interaction terms and main effects and impulsivity that in the corr matrix seems the most correlated variable
+
+model 2 contains some possible varaible that apperar more discriminative and influential
+
 ```{r}
-mod_manual <- glm(suicide ~ family_economic_status + psychiatric_symptoms +impulsivity +self_injury_behaviors, data=df_train, family="binomial")
-summary(mod_manual)
+mod_manual1_interaction <- glm(
+  suicide ~ impulsivity + self_injury_behaviors + family_economic_status +
+    eating_problems + major + sleeping_disturbance + 
+    family_economic_status:eating_problems + major:sleeping_disturbance,
+  data = df_train,
+  family = "binomial"
+)
+summary(mod_manual1_interaction)
 
+mod_manual2 <- glm(
+  suicide ~ gender + grade + birth_place + impulsivity + self_injury_behaviors +
+    hostile_aggression + psychiatric_symptoms,
+  data = df_train,
+  family = "binomial"
+)
+summary(mod_manual2)
+
+print(BIC(mod_full, mod_manual1_interaction, mod_manual2))
 ```
+Including the interaction terms and the variables considered in the scatter plots seems to leed no benefit to the model because they seems not significance based on these data. Also the BIC score that pelanlize more the complex model is higher compared with the model with all predictors. The model including the other predictors selected manually are all strongly significant except some levels in the variable grade. The information criteria is higher also in this case with respect to the full model.
 
-
-## Category aggregation
 
 ## Stepwise regression
 ```{r}
@@ -374,7 +419,7 @@ abline(v = log(mod_lasso$lambda.1se), lty = "dashed")
 plot(mod_lasso)
 abline(v = log(mod_lasso$lambda.1se), lty = "dashed")
 ```
-
+Notice that the implementation of Lasso of glmnetUtils deliberately avoids the usual treatment of factors with a reference level “absorbed” by the intercept. The model considered it's more interpretable because otherwise the method could cancel the differences in level of factor predictors
 ## LDA
 ```{r}
 mod_lda <- lda(suicide~., data=df_train)
@@ -428,14 +473,37 @@ mod_test <- glm(cbind(scaled_suicide, (max(scaled_suicide) - scaled_suicide)) ~
              .,
            family = "binomial",
            data = df_train)
-table(
- preds = predict(mod_test, newdata = df_test, type = "response"),
- true = df_test$scaled_suicide
-)
+#table(
+# preds = predict(mod_test, newdata = df_test, type = "response"),
+# true = df_test$scaled_suicide
+#)
 df$scaled_suicide <- NULL
 df_train <- df[idx,]
 df_test <- df[-idx,]
 ```
+
+
+<!-- ## Category aggregation -->
+<!-- Due to the discrete nature of the symptmoms numeric predictor, an attempt to aggregate them in 3 categories is performed. Specifically: -->
+
+<!-- - For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones. -->
+
+<!-- - The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms. -->
+
+<!-- ```{r} -->
+<!-- df_agg <- data.frame(df) -->
+<!-- df_agg[["internet_addiction"]] <- reduce_df_categories_to3(df_agg, "internet_addiction", c(11, 16), c("Low", "Medium", "High")) -->
+
+<!-- for (col in symptoms_cols[-6]){ -->
+<!--   df_agg[[col]] <- reduce_df_categories_to3(df_agg, col, c(8, 12), c("Low", "Medium", "High")) -->
+<!-- } -->
+<!-- summary(df_agg[,symptoms_cols]) -->
+
+<!-- df_agg_train <- df_agg[idx,] -->
+<!-- df_agg_test <- df_agg[-idx,] -->
+<!-- mod_agg <- glm(suicide~., data=df_agg_train, family="binomial") -->
+<!-- mod -->
+<!-- ``` -->
 
 # Model comparison
 ```{r}
