@@ -50,3 +50,28 @@ ggplot(df_agg, aes(x = predictor, y = proportion, fill = response)) +
   scale_y_continuous(labels = scales::percent) +
   labs(x = "Predictor Variable", y = "Proportion within Response", fill = "Response") +
   theme_minimal() 
+
+
+
+# Function to extract predictors from a formula that are in a given vector
+extract_predictors <- function(formula, input_vector) {
+  # Extract the terms object from the formula
+  terms_obj <- terms(formula)
+  
+  # Extract the variable names from the terms object
+  vars <- attr(terms_obj, "variables")
+  
+  # Convert to character and exclude the response variable
+  predictors <- as.character(vars[-1])
+  
+  # Return the intersection of predictors and input_vector
+  common_predictors <- intersect(predictors, input_vector)
+  
+  return(common_predictors)
+}
+
+# Example usage
+example_formula <- y ~ x1 + x2 + x3 + x4
+input_vector <- c("x1", "x3", "x5")
+extract_predictors(example_formula, input_vector)
+

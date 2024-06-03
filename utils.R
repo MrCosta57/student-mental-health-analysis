@@ -45,6 +45,23 @@ reduce_df_categories_to3 <- function(df_src, col_name, thresholds, levels) {
 }
 
 
+# Function to extract predictors from a formula that are in a given vector
+extract_predictors <- function(formula, input_vector) {
+  # Extract the terms object from the formula
+  terms_obj <- terms(formula)
+  
+  # Extract the variable names from the terms object
+  vars <- attr(terms_obj, "variables")
+  
+  # Convert to character and exclude the response variable
+  predictors <- as.character(vars[-1])
+  
+  # Return the intersection of predictors and input_vector
+  common_predictors <- intersect(predictors, input_vector)
+  
+  return(common_predictors)
+}
+
 plot_freq_by_category <- function(data, freq_var, binary_category) {
   pred_label <- NULL
   if (is.factor(data[[freq_var]])) {
