@@ -37,3 +37,27 @@ TODO MODIFY THE CRITERIA HERE
 - For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones.
 
 - The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms.
+
+
+
+<!-- ## Category aggregation -->
+<!-- Due to the discrete nature of the symptmoms numeric predictor, an attempt to aggregate them in 3 categories is performed. Specifically: -->
+
+<!-- - For the predictor `internet_addiction`, the thresholds are established as follows: [5, 11) for `Low`, [11, 16) for `Medium`, and [16, 20) for `High`. The `Low` range is the most extensive, reflecting the previous assertion that empirically in medicine lower values are less significant compared to medium or higher ones. -->
+
+<!-- - The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms. -->
+
+<!-- ```{r} -->
+<!-- df_agg <- data.frame(df) -->
+<!-- df_agg[["internet_addiction"]] <- reduce_df_categories_to3(df_agg, "internet_addiction", c(11, 16), c("Low", "Medium", "High")) -->
+
+<!-- for (col in symptoms_cols[-6]){ -->
+<!--   df_agg[[col]] <- reduce_df_categories_to3(df_agg, col, c(8, 12), c("Low", "Medium", "High")) -->
+<!-- } -->
+<!-- summary(df_agg[,symptoms_cols]) -->
+
+<!-- df_agg_train <- df_agg[idx,] -->
+<!-- df_agg_test <- df_agg[-idx,] -->
+<!-- mod_agg <- glm(suicide~., data=df_agg_train, family="binomial") -->
+<!-- mod -->
+<!-- ``` -->

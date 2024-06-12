@@ -15,11 +15,14 @@ print_summary_custom <- function(df) {
 }
 
 var_name_to_label <- function(var_name, end_text = "score") {
-  return(paste(str_to_sentence(str_replace_all(var_name, "_", " ")), end_text, sep =
-                 if (end_text != "")
-                   " "
-               else
-                 ""))
+  return(paste(str_to_sentence(str_replace_all(var_name, "_", " ")), end_text,
+    sep =
+      if (end_text != "") {
+        " "
+      } else {
+        ""
+      }
+  ))
 }
 
 var_name_to_intitle <- function(var_name) {
@@ -35,30 +38,32 @@ split_camel_case <- function(input_string) {
 
 
 reduce_df_categories_to3 <- function(df_src, col_name, thresholds, levels) {
-  res <- factor(ifelse(
-    df_src[[col_name]] < thresholds[1],
-    levels[1],
-    ifelse(df_src[[col_name]] < thresholds[2], levels[2], levels[3])
-  ),
-  levels = levels)
+  res <- factor(
+    ifelse(
+      df_src[[col_name]] < thresholds[1],
+      levels[1],
+      ifelse(df_src[[col_name]] < thresholds[2], levels[2], levels[3])
+    ),
+    levels = levels
+  )
   return(res)
 }
 
 
 # Function to extract predictors from a formula that are in a given vector
-extract_predictors <- function(formula, input_vector) {
+extract_predictors_in_vec <- function(formula, input_vector) {
   # Extract the terms object from the formula
   terms_obj <- terms(formula)
-  
+
   # Extract the variable names from the terms object
   vars <- attr(terms_obj, "variables")
-  
+
   # Convert to character and exclude the response variable
   predictors <- as.character(vars[-1])
-  
+
   # Return the intersection of predictors and input_vector
   common_predictors <- intersect(predictors, input_vector)
-  
+
   return(common_predictors)
 }
 
@@ -66,22 +71,22 @@ plot_freq_by_category <- function(data, freq_var, binary_category) {
   pred_label <- NULL
   if (is.factor(data[[freq_var]])) {
     data[[freq_var]] <- factor(data[[freq_var]],
-                               levels = levels(data[[freq_var]]),
-                               labels = to_vec(for (l in levels(data[[freq_var]]))
-                                 split_camel_case(l)))
+      levels = levels(data[[freq_var]]),
+      labels = to_vec(for (l in levels(data[[freq_var]])) {
+        split_camel_case(l)
+      })
+    )
     pred_label <- var_name_to_label(freq_var, "")
-    
-  } else{
+  } else {
     pred_label <- var_name_to_label(freq_var)
   }
-  
+
   resp_label <- var_name_to_label(binary_category, "")
-  
-  
+
+
   # Create the plot
   p <- ggplot(
-    data %>% group_by(.data[[freq_var]], .data[[binary_category]])  %>% summarise(freq = n()),
-    
+    data %>% group_by(.data[[freq_var]], .data[[binary_category]]) %>% summarise(freq = n()),
     aes(x = .data[[freq_var]], y = freq, fill = .data[[binary_category]])
   ) +
     geom_bar(stat = "identity", position = "dodge") +
@@ -109,36 +114,43 @@ plot_freq_by_category <- function(data, freq_var, binary_category) {
       size = 3
     ) +
     scale_fill_brewer(palette = "Paired")
-  
+
   if (is.factor(data[[freq_var]])) {
     p <- p + scale_x_discrete(labels = label_wrap(15))
   }
   print(p)
 }
 
+jitter_subset <- function(data, cols, factor = 0.0001) {
+  return(data %>%
+    mutate(across(all_of(cols), ~ jitter(.x, factor = factor))))
+}
 
 plot_proportion_by_category <- function(data, freq_var, binary_category) {
   pred_label <- NULL
   if (is.factor(data[[freq_var]])) {
     data[[freq_var]] <- factor(data[[freq_var]],
-                               levels = levels(data[[freq_var]]),
-                               labels = to_vec(for (l in levels(data[[freq_var]]))
-                                 split_camel_case(l)))
+      levels = levels(data[[freq_var]]),
+      labels = to_vec(for (l in levels(data[[freq_var]])) {
+        split_camel_case(l)
+      })
+    )
     pred_label <- var_name_to_label(freq_var, "")
-    
-  } else{
+  } else {
     pred_label <- var_name_to_label(freq_var)
   }
-  
+
   resp_label <- var_name_to_label(binary_category, "")
-  
+
   p <- ggplot(
-    data %>% group_by(.data[[freq_var]], .data[[binary_category]])  %>% summarise(freq = n()) %>% mutate(ratio = freq / sum(freq)),
+    data %>% group_by(.data[[freq_var]], .data[[binary_category]]) %>% summarise(freq = n()) %>% mutate(ratio = freq / sum(freq)),
     aes(x = .data[[freq_var]], y = ratio, fill = .data[[binary_category]])
   ) +
     geom_bar(position = "fill", stat = "identity") +
-    geom_text(aes(label = scales::percent(ratio, accuracy = 0.1)), position =
-                position_fill(vjust = 0.5)) +
+    geom_text(aes(label = scales::percent(ratio, accuracy = 0.1)),
+      position =
+        position_fill(vjust = 0.5)
+    ) +
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5)) +
     labs(
@@ -153,12 +165,13 @@ plot_proportion_by_category <- function(data, freq_var, binary_category) {
       x = pred_label,
       y = "Percentage",
       fill = resp_label
-    ) + scale_fill_brewer(palette = "Paired")
-  
+    ) +
+    scale_fill_brewer(palette = "Paired")
+
   if (is.factor(data[[freq_var]])) {
     p <- p + scale_x_discrete(labels = label_wrap(15))
   }
-  
+
   print(p)
 }
 
