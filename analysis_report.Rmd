@@ -28,13 +28,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # Introduction
 This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. The analysis seeks to provide a comprehensive understanding of the mental health landscape, by utilizing one dataset coming from a survey, with a particular focus on psychiatric symptoms and other associated health problems.
 
-The importance of this analysis lies in its potential to uncover hidden patterns and relationships among various factors affecting students' mental health in provided data, to better understand their contributions in this issue.
-
-One of the key purposes of this project is to predict whether certain individuals may be at a higher risk of suicidal ideation. This predictive analysis could potentially serve as an early warning system, enabling universities to provide timely intervention and support to those in need.
-
-Furthermore, this project aims to provide actionable insights that can guide the development of more effective mental health policies and support systems within universities. By understanding the specific challenges faced by students, universities can tailor their resources and initiatives to better address these issues, ultimately fostering a healthier, more supportive academic environment.
-
-The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a>, contains 27014 objects with 16 features. The first six are categorical information about the general individual condition, instead the others are numeric variables related to the mental health of the students, where the higher score indicates more serious symptoms. Additional details regarding the data scales, where the data comes from and the methodology for retrieving them are not provided by the dataset website.<br/>
+The dataset, that can be retrieved <a href="https://psycharchives.org/en/item/5d25cf8a-7910-4579-9e39-688c6bbec43a">here</a>, contains 27014 objects with 16 features. The first six information are categorical and related to the general individual condition, instead, the others are numeric variables associated with the mental health of the students, where the higher score indicates more serious symptoms. Additional details regarding the data scales, the data origin, and the retrieving methodology are not provided by the dataset’s website.<br/>
 A specific description of these features is provided below:
 
 1. **gender**: 0=Female, 1=Male
@@ -63,7 +57,7 @@ set.seed(123) # set pseudorandom generator for reprocucibility
 # Load all the packages and install them if they are not present
 requirements <- c(
   "summarytools", "MASS", "effects", "pROC", "mgcv",
-  "glmnetUtils", "e1071", "class",
+  "glmnetUtils", "e1071", "class", “car”,
   "stringr", "ggplot2", "reshape2", "scales", "comprehenr",
   "randomForest", "dplyr", "ggcorrplot"
 )
@@ -83,7 +77,8 @@ source("utils.R")
 
 # First overview and data engineering
 
-In this section, exploratory data analysis (EDA) is performed to understand the structure of the dataset and identify any potential issues that need to be addressed. Also, data engineering is applied to transform the variables into the appropriate format.
+In this section, exploratory data analysis (EDA) is performed to understand the dataset structure and identify any potential issues that need to be addressed. Also, variables are transformed into the appropriate format.
+
 ```{r}
 # Read the dataset
 df <- read.csv("data/mental_health_data.csv")
@@ -157,29 +152,29 @@ sum(duplicated(df))
 head(df, 3)
 ```
 
-From the above table it can be seen that all the column have the right format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to keep these rows to mantain the original dataset semantics.
+From the above table it can be seen that all the column have the expected format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refers to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's choosen to keep these rows to mantain the original dataset semantics.
 
 Talking about the summary of the dataset different aspects can be observed:
 
 - The majority of the students are female (67.5\%)
-- A lot of person have at least one brother or sisters (72.8\%)
-- Less students in the dataset are from Medium to Large Cities (10.2\%)
+- A lot of people have at least one brother or sister (72.8\%)
+- Fewer students in the dataset are from medium to large cities (10.2\%)
 - The number of students with average family economic status is the highest (66.8\%), instead the number of students with rich family it quite low (0.4\%)
-- The most common major is Liberal (58.5\%)
-- Only 0.3\% of the person are undergraduate with grade five, instead the other grades are quite equally distributed
-- The mean value of the variable Internet addiction is near 10 (scale [5, 20]) while the means for sleeping disturbance, impulsivity, compulsion, dependence are around 7 (scale [4, 16]). These symptoms scores are a bit higher with respect to the other variables values
+- The most common major is liberal (58.5\%)
+- Only 0.3\% of the people are undergraduates with grade five, instead the other grades are quite equally distributed
+- The mean value of the variable Internet addiction is near 10 (scale [5, 20]) while the mean for sleeping disturbance, impulsivity, compulsion, and dependence are around 7 (scale [4, 16]). These symptom scores are a bit higher with respect to the other variables values
 - No peoples with self-injury behaviors has symptoms of value 15 and they have the lowest average score (4.82), suggesting it might be the least prevalent issue
-- In general students with very high symptoms are fortunately the minority among the observed data sample, so the numeric distribution is right skewed.
+- In general students with very high symptoms are fortunately the minority among the observed data sample, so the numeric distributions are right skewed.
 
 
-For convenience, in this analysis it's decided to transform the variable *suicide* in a binary feature, considering the current problem as a classification task.<br/>
-In this sense, the values of *suicide* lower or equal to 8 take the value FALSE, instead the other take the value TRUE. The choice of this threshold is considered reasonable because the purpose of this analysis is to consider higher severity of suicide but at the same time don't underestimate the risk even if the value of severity is not too high.
+For convenience, in this analysis, it's decided to transform the variable *suicide* into a binary feature, considering the current problem as a classification task.<br/>
+In this sense, the values of *suicide* lower or equal to 9 take the value *FALSE*, instead the other takes the value *TRUE*. The choice of this threshold is considered reasonable because the purpose of this analysis is to consider the higher severity of suicide but at the same time don't underestimate the risk even if the value is not too big.
 
 
 ```{r}
 print(summary(df$suicide))
 
-threshold_suicide <- 8
+threshold_suicide <- 9
 numeric_suicide <- df$suicide
 scaled_suicide <- numeric_suicide - min(numeric_suicide)
 factor_suicide <- as.factor(df$suicide > threshold_suicide)
@@ -190,9 +185,9 @@ print(summary(df$suicide))
 
 
 # Exploratory Data Analysis
-After a first overview of the data it's needed to inspect some possible relations and hidden pattern between the variables. Some guessed interaction terms are also checked.
+After a first overview of the data, it's needed to inspect some possible relations and hidden patterns between the variables. Some hypothesized interaction terms are also checked.
 
-## Frequencies with respect to response variable
+## Frequencies concerning response variable
 
 ### General information columns
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
@@ -201,8 +196,8 @@ for (col in general_cols) {
 }
 ```
 
-Looking at the bar plots referring to the general information about the students, it seems that there are no strange relationship between the categories and the values of the frequencies for the variable *suicide*: in particular the higher number of suicide for a categorical level is usually related with the higher number of person in that level.
-Just for the grade *Freshmen* the number of suicide is higher than the other levels, and in particular there are less suicide for lower grading. Grade variable it's possibly related to some age information that in the dataframe is not present and it could suggest that yunger person are less prone to suicide. 
+Looking at the bar plots referring to the general information about the students, it seems that there are no strange relationships between the categories and the values of the frequencies for the variable *suicide*: in particular the higher number of suicides for a categorical level is usually related with the higher number of person in that level.
+Just for the grade *Freshmen* the number of suicides is higher than the other levels, and in particular, there are fewer suicides for lower grading. Also, the *grade* variable is possibly related to some age information that in the dataframe is not present and it could suggest that younger people are less prone to suicide ideal. 
 
 
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
@@ -211,15 +206,15 @@ for (col in general_cols) {
 }
 ```
 
-The plots above regarding the proportions of students for each category divided by suidice response values instead highlight interesting patterns: indeed it's more clear to understand the relationships by these plots that consider the ratios and not the frequencies because the y scale is large.
+The plots above regarding the proportions of students for each category divided by the response values instead highlight interesting patterns: indeed it's more clear to understand the relationships by plots that consider ratios and not the frequencies, also because the y scale is different.
 
-There are few visible things by this visualization:
+There are a few visible things in these visualizations:
 
-- The relative difference in suicide frequency considering the *gender* seems not so significant based on these data, instead the gap is more noticeable compared with *whether only child*
-- It seems that the percentage of suicide in *Medium to Large cities* is higher.
-- Being in a rich family lead to higher proportion of suicide based on this dataset
-- Attempting the Liberal or the Art major have similar suicide ratio and this is higher with respect to science courses
-- As observed before the percentage of positive values in the response variable is higher for freshman category 
+- The relative difference in suicide frequency considering the gender seems not so significant based on these data, instead, the gap is more noticeable compared with *whether only child* variable
+- It seems that the percentage of suicide in medium to large cities* is higher.
+- Being in a rich family leads to a higher proportion of suicide based on this dataset, even more that being in extremely poor family economic condition
+- Attempting the art major has a similar suicide ratio and this is higher with respect to liberal and science courses
+- As observed before the percentage of positive values in the response variable is higher for the freshman category 
 
 
 ### Symptoms information columns
@@ -229,8 +224,7 @@ for (col in symptoms_cols) {
 }
 ```
 
-The histograms of the symptoms features show a slightly different behavior compared with the other categorical predictors. As observed in the beginning the number of high serverity symptoms in general is low but the frequency of suicide get bigger when these symptoms increase (compulsion, internet addition, sleeping disturbance)
-
+The histograms of the symptoms features show a slightly different behavior compared with the previous categorical predictors' plots. As observed in the beginning, the number of high-severity symptoms in general is low but the frequency of suicide gets bigger when these symptoms increase.
 
 ```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in symptoms_cols) {
@@ -239,7 +233,7 @@ for (col in symptoms_cols) {
 ```
 
 
-Checking the proportion histograms divided by the response variable what stated in the previously becomes more evident: now it can be seen noticeable increasing trend in the suicide ratios when the symtoms severity increases and in particular the percentage are higher for the variables psyciatric symptoms, hostile aggression, self-injury behaviours and eating problems, even if the frequency of the higher symtoms for them is quite low (except for compulsion)
+Checking the proportion histograms divided by the response variable what was stated previously becomes more evident: now it can be seen a noticeable increasing trend in the suicide ratios when the symptoms severity increases and in particular the percentage is higher for the variables psychiatric symptoms, hostile aggression, self-injury behaviors and eating problems, even if the frequency of the higher symptoms for them is quite low (except for impulsivity and compulsion variables)
 
 
 ## Numeric variables
@@ -257,9 +251,9 @@ ggcorrplot(corr_matrix,
 )
 ```
 
-The heatmap of the correlation matrix shows that all the variables are quite highly positive correlated with each other. By the plot can be seen that the most correlated variables are *impulsivity* and *compulsion* (0.72), *dependence* and *impulsivity* (0.71), *dependence* and *compulsion* (0.68). Also *self-injury behaviours* and *eating problems* seems to be correlated in a significant way (0.66).
+The heatmap of the correlation matrix shows that all the variables are quite highly positively correlated with each other. By the plot can be seen that the most correlated variables are *impulsivity* and *compulsion* (0.72), *dependence* and *impulsivity* (0.71), *dependence* and *compulsion* (0.68). Also *self-injury behaviours* and *eating problems* seem to be correlated in a significant way (0.66).
 
-Correlation coefficient significance test is performed to check if for these features correlation is statistically significant. The formula for the t-statistic is: 
+The correlation coefficient significance test is performed to check if for these features correlation is statistically significant. The formula for the t-statistic is: 
 
 $$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$$
 where \(r\) is the correlation coefficient and \(n\) is the number of observations. The null hypothesis is that the correlation coefficient is equal to zero, and the alternative hypothesis is that the correlation coefficient is not equal to zero. The degrees of freedom for the t-distribution are \(n-2\). The p-value is calculated as the probability of observing a t-statistic as extreme as the one calculated from the data, assuming the null hypothesis is true.
@@ -280,7 +274,7 @@ Just for better understanding the possible interaction between the variables, so
 
 In particular the following interactions are considered:
 
-- **Psychiatric symptoms and gender**: It's important  to inspect these variables because psychiatric conditions often manifest differently across genders, potentially leading to gender-specific patterns in symptoms and treatment outcomes.
+- **Psychiatric symptoms and gender**: It's important to inspect these variables because psychiatric conditions often manifest differently across genders, potentially leading to gender-specific patterns in symptoms and treatment outcomes.
 
 - **Eating problems and family economic status**: Economic factors can affect access to resources and support for managing eating problems, influencing the severity and consequences of these issues in different socioeconomic groups.
 
@@ -344,7 +338,7 @@ For these data, it seems that just the interaction between *eating problems and 
 # Models developement
 In a statistical analysis, splitting data into training and testing sets is crucial for model development. This process allows us to build the model using the training set and then evaluate its performance on the unseen testing set. The hyperparameter tuning where required is instead performed by cross validation on the training partition. This it's needed to check if the model generalizes well to new data and provides an unbiased estimate of its predictive accuracy.
 
-The reference level for the categorical predictors in a full model is a female student with brothers/sisters, from the countryside with extremely poor family, liberal major and postgraduate.
+The reference level for the categorical predictors in a full model is a female student with brothers/sisters, from the countryside with an extremely poor family, liberal major and postgraduate.
 
 ```{r}
 idx <- sample(nrow(df), 0.80 * nrow(df))
@@ -364,8 +358,8 @@ for (i in general_cols) {
 
 
 ## Logistic regression
-Logistic regression is used for modeling directly the probability that the response variable belong to a particluar class.
-The coefficients of this generalized linear model in this case represent the log-odds increment/decrement of the outcome (suicide) for a one-unit increase in the predictor variable, holding all other variables constant. A positive coefficient indicates an increase in the log-odds of suicide, while a negative coefficient indicates a decrease.
+Logistic regression is used for modeling directly the probability that the response variable belongs to a particular class.
+The coefficients of this generalized linear model in this case represent the log-odds change of the outcome (suicide) for a one-unit increase in the predictor variable, holding all other variables constant. A positive coefficient indicates an increase in the log-odds of suicide, while a negative coefficient indicates a decrease.
 
 ### Full model
 ```{r}
@@ -376,15 +370,16 @@ summary(mod_full)
 Examining the model that includes all the variables, several predictors appear to be strongly significant. Notably, the intercept, which corresponds to the reference level and numeric predictors with coefficients of 0, has a log-odds value of `r mod_full$coefficients[1]`. When converted, this log-odds value represents a probability of `r exp(mod_full$coefficients[1])/(1-exp(mod_full$coefficients[1]))` for the response variable $\mathcal{P}(suicide)=\frac{e^{\beta_0}}{1+e^{\beta_0}}$.
 
 
-In particular the following model interpretation is considered:
+In particular, the following model interpretation is considered:
 
 - Being male decreases the log-odds of suicide compared to being female. This suggests that males are less likely to report suicidal tendencies than females in this dataset
 - Students from towns, small cities, and medium to large cities have higher log-odds of suicide compared to students from rural areas. This indicates that urbanization might be associated with higher suicidal tendencies.
-- Being a science major decreases the log-odds of suicide compared to the reference category
+- Being in a family with poor, average or good econimic status leads to a large decrease in the log-odds, instead being in a rich family seems to be not significant in this model 
 - Freshmen grade has the highest value for the coefficient and it's strongly significant.
 - All the symptoms predictor are significant of strongly significant except for eating_problems. Higher levels of psychiatric symptoms, impulsivity, compulsion, sleeping disturbances, internet addiction, hostile aggression, and self-injury behaviors are associated with increased log-odds of suicide. Dependence, however, shows a negative relationship, suggesting that higher dependence decreases the log-odds of suicide for these data.
+- The levels in whether only child and in major have high p-values for the significance test and they seem not influential
 
-The above interpretation can be also visualized checking the effect plots, paying attention to the fact that now the y axis represent the response scale (not the log-odds)
+The above interpretation can be also visualized by checking the effect plots, paying attention to the fact that now the y-axis is represented in the response scale (not the log-odds one)
 
 ```{r}
 for (i in general_cols) {
@@ -402,10 +397,7 @@ for (i in symptoms_cols) {
 ### Manual selection
 
 Given the available information, an attempt in developing a model manually is proposed.
-Specifically, ....
-model 1 contains interaction terms and main effects and impulsivity that in the corr matrix seems the most correlated variable
-
-model 2 contains some possible variables that appear more discriminative and influential
+Specifically, the first model contains some significant variables present in the full model, the previously checked interaction terms that seems influential and their main effects, impulsivity feature that in the corr matrix seems the most correlated variable. The second model instead contains some possible variables that appear more discriminative
 
 ```{r}
 mod_manual1_interaction <- glm(
@@ -427,7 +419,10 @@ summary(mod_manual2)
 
 print(BIC(mod_full, mod_manual1_interaction, mod_manual2))
 ```
-Including the interaction terms and the variables considered in the scatter plots seems to leed no benefit to the model because they seems not significance based on these data. Also the BIC score that penalize more the complex model is higher compared with the model with all predictors. The model including the other predictors selected manually are all strongly significant except some levels in the variable grade. The information criteria is higher also in this case with respect to the full model.
+
+Including the interaction terms and the variables considered in the scatter plots seems to lead no benefit to the model because they appear not significant based on these data. Also, the BIC score that penalizes more the complex model, is higher compared with the model with all predictors. The second manual has all significant predictors, except for some levels in the variable grade. The information criteria is higher also in this case with respect to the full model.
+
+For both the manual model, the significant coefficients have the same sign but different values compared with the full model
 
 
 ### Stepwise regression
@@ -440,56 +435,57 @@ mod_step_aic <- stepAIC(mod_zero, direction = "both", scope = list(upper = formu
 summary(mod_step_aic)
 ```
 
-The logistic regression model identifies several significant predictors of suicide among students. Psychiatric symptoms, sleeping disturbance, self-injury behaviors, compulsion, grade (especially freshmen and sophomores), hostile aggression, certain birth places, internet addiction, and gender show significant associations with the likelihood of suicide. Notably, being a science major and higher dependence are associated with lower likelihoods of suicide. The model seems to have a good explainable power as indicated the the slight reduction of the AIC score with respect to full model, however the predictors are still a bit (13 features vs 16 total).
+The logistic regression model identifies several significant predictors of suicide among students. Psychiatric symptoms, sleeping disturbance, self-injury behaviors, compulsion, grade (sophomores, freshmen and senior), hostile aggression, birth places, internet addiction and impulsivity show significant associations with the likelihood of suicide. Notably, being a science major and higher dependence are associated with lower likelihoods of suicide. The model seems to have a good explainable power as indicated the the slight reduction of the AIC score with respect to full model, however the predictors are still a bit (12 features selected vs 15 total features).
 
-It's possible to try stepwise regression using BIC information criteria to select a more parsimonius model
+It's possible to try stepwise regression using BIC information criteria to select a more parsimonious model
+
 ```{r}
 # BIC stepwise regression
 mod_step_bic <- stepAIC(mod_zero, direction = "both", scope = list(upper = formula(mod_full)), trace = 0, k = log(nrow(df_train)))
 summary(mod_step_bic)
 ```
 
-Both models consistently identify psychiatric symptoms, sleeping disturbance, self-injury behaviors, compulsion, impulsivity, dependence, gender, and hostile aggression as significant predictors.
-The AIC model includes additional significant predictors not found in the BIC model, such as certain grades (especially Freshman), some birth places, internet addiction, and specific majors. The choice between the models depends on the preference for model complexity versus simplicity and the specific goals of the analysis.
+Both models consistently identify psychiatric symptoms, sleeping disturbance, self-injury behaviors, compulsion and hostile aggression as significant predictors. The sign of the estimated coefficient is the same for them.
+The AIC model as can be deducted includes additional significant predictors not present in the BIC model. The choice between the models depends on the preference for model complexity versus simplicity and the specific goals of the analysis.
 
 For completeness, effect plots from the stepwise regression model with AIC are provided:
-
 ```{r}
 for (i in extract_predictors_in_vec(mod_step_aic$formula, general_cols)) {
-  print(plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE))
+  plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
 }
 ```
 
 ```{r}
 for (i in extract_predictors_in_vec(mod_step_aic$formula, symptoms_cols)) {
-  print(plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE))
+  plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
 }
 ```
 
 
 
 ### Lasso shrinkage method
-Lasso introduces a penalty term to the standard regression objective function, encouraging sparsity by shrinking the coefficients of less important predictors towards zero. This regularization actually perform a feature selection, making it particularly useful when dealing with high-dimensional datasets with potentially correlated predictors.
+Lasso introduces a penalty term to the standard regression objective function, encouraging sparsity by shrinking the coefficients of less important predictors toward zero. This regularization performs a feature selection, making it particularly useful when dealing with high-dimensional datasets with potentially correlated predictors.
+
+Notice that the implementation of Lasso in glmnetUtils library deliberately avoids the usual treatment of factors with a reference level “absorbed” by the intercept. The model considered it's more interpretable because otherwise the method could cancel the differences in the factor levels of the predictors.
 
 
 ```{r}
-mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", alpha = 1)
-beta <- coef(mod_lasso, s = mod_lasso$lambda.1se)
-beta_1se_idx <- which(beta[, 1] != 0)
-print(cbind(beta_1se_idx, beta[beta_1se_idx])[, 2])
+mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", alpha = 1, nfolds = 10)
+beta_1se <- coef(mod_lasso, s = mod_lasso$lambda.1se)
+beta_1se_idx <- which(beta_1se[, 1] != 0)
+print(format(cbind(beta_1se_idx, beta_1se[beta_1se_idx])[, 2], scientific = FALSE))
+print(sum(beta_1se[, 1] != 0))
 ```
 
-The fitted logistic regression model suggests that several factors, including being a freshman, the presence of psychiatric symptoms, impulsivity, compulsion, sleeping disturbances, hostile aggression, and self-injury behaviors, contribute to an increased likelihood of experiencing mental health issues among students. In particular the coefficients of psychiatric_symptoms and self_injury_behaviors are higher than the others. Conversely, being born in the countryside has a very small negative effect on the likelihood of experiencing these issues. Also in this case the log-odds value of the intercept is negative.<br/>
-As can be observed the majority coefficients keept by the model are related to symptoms features, instead just the level country side of the variable bith_place and the grade Freshman seems relevant for these data.
+The fitted logistic regression model suggests several factors, all related to symptom variables, including being a freshman, the presence of psychiatric symptoms, and they contribute all positively to a higher risk of suicide.
 
-If compared to the coefficients selected from stepwise regression and BIC information criteria, the magnitude of the common coefficients is smaller, indicating that the lasso model tends to shrink the coefficients towards zero as extected. In addition the two models vary just by the selection of dependence and gender for BIC and the selection of birth place (countryside) and grade (freshman) for Lasso, means that the two models are quite similar but highlight some different predictors.
+If compared to the coefficients selected from stepwise regression, the magnitude of the common coefficients is usually smaller, indicating that the lasso model tends to shrink the coefficients towards zero as expected. In addition, BIC and Lasso models select the same predictors.
 
 
-Looking at the below plots can be seen the the coefficients shrinkage with respect to the log lambda value and the behaviour of the binomial deviance with respect to this hyper parameter. The dotted line represents the log lambda value that minimizes the cross-validated error, while the dashed line represents the log lambda value that is within one standard error of the minimum.<br/>
-The plots show that the model is quite stable with respect to the lambda value, and the coefficients are not drastically affected by the regularization.
-
+Looking at the below plots can be seen the coefficients shrinkage with respect to the log lambda value in the first, and the behaviour of the binomial deviance with respect to this hyper parameter in the latter. The dotted line represents the log lambda value that minimizes the cross-validated error, while the dashed line represents the log lambda value that is within one standard error of the minimum.<br/>
 It's decided to take the model with the lambda value plus one standard error because it's more parsimonious and the difference in the binomial deviance is not so high with respect to the minimum value.
-```{r}
+
+```{r echo=FALSE}
 plot(mod_lasso$glmnet.fit, xvar = "lambda")
 abline(v = log(mod_lasso$lambda.min), lty = "dotted", col = "darkorange")
 abline(v = log(mod_lasso$lambda.1se), lty = "dashed", col = "steelblue")
@@ -511,13 +507,11 @@ legend("topright",
 )
 ```
 
-Notice that the implementation of Lasso of glmnetUtils deliberately avoids the usual treatment of factors with a reference level “absorbed” by the intercept. The model considered it's more interpretable because otherwise the method could cancel the differences in level of factor predictors
-
 
 ## Generative models
-After modelling directly the response variable by logistic regression based model, it's possible to consider generative models that estimates the class-specific densities and then uses Bayes' theorem to estimate the posterior probabilities of the classes. These type of models are more stable and robust when there's a substantial separation between the classes as probably in this case.
+After modeling directly the response variable by logistic regression based model, it's possible to consider generative models that estimate the class-specific densities and then use Bayes' theorem to derive the posterior probabilities of the classes. These types of models are more stable and robust when there's a substantial separation between the classes as probably in this case.
 
-To enhance interpretability for all the generative model, the predictios selected by stepwise regression with BIC information criteria are used in the model fitting.
+To enhance interpretability for all the generative models, the preditors selected by stepwise regression with BIC information criteria are used in the model fitting.
  
 
 ### Linear Discriminant Analysis (LDA)
@@ -526,9 +520,12 @@ The LDA model assumes that the predictors are normally distributed and that the 
 mod_lda <- lda(mod_step_bic$formula, data = df_train)
 mod_lda
 ```
+The printed output of LDA includes the a-priori probabilities of suicide and the group means.<br/>
+The proportion of training observation that belongs to positive suicide variables is fortunately quite low. As previously observed different times, when response variable is true and predictor are the symptom variables, their mean is higher compared with the case in which response variable is false.
+
 
 ### Quadratic Discriminant Analysis (QDA)
-The QDA model generalize the LDA assuming different covariance matrices for each class, so the flexibility is increased but the number of parameters to estimate is much larger
+The QDA model generalizes the LDA assuming different covariance matrices for each class, so the flexibility is increased but the number of parameters to estimate is much larger
 
 ```{r}
 mod_qda <- qda(mod_step_bic$formula, data = df_train)
@@ -536,12 +533,13 @@ mod_qda
 ```
 
 ### Naive Bayes
-Naive Bayes instead make the assumption of independence between the predictors to estimates the class-specific densities, this assumption usually introduces bias but reduce the variance component of the error
+Naive Bayes instead make the assumption of independence between the predictors to estimate the class-specific densities, this assumption usually introduces bias but reduces the variance component of the error. The standard naive Bayes classifier for estimating univariate class densities of quantitative predictors assumes Gaussian distribution (likelihood component)
 
 ```{r}
 mod_nb <- naiveBayes(mod_step_bic$formula, data = df_train)
 mod_nb
 ```
+The output of naiveBayes contains the estimated a-priori probabilities and a table containing the mean and standard deviation of the numeric variables, conditioned by the response.
 
 
 ## Other models
@@ -554,13 +552,14 @@ Also for KNN model the predictor used are the one selected by stepwise regressio
 # as.character(mod_step_bic$formula)[-2] extract the predictors and the tilde symbol from the formula
 knn_formula <- formula(paste(as.character(mod_step_bic$formula)[-2], collapse = ""))
 
+# Add a small noise to solve “too many ties in knn()” error
 x.train <- model.matrix(knn_formula, data = subset(jitter_subset(df_train, symptoms_cols), select = -suicide))[, -1]
 x.test <- model.matrix(knn_formula, data = subset(jitter_subset(df_test, symptoms_cols), select = -suicide))[, -1]
 
 k_max <- 3
 rates <- double(k_max)
 for (i in 1:k_max) {
-  tmp <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = i, use.all = FALSE)
+  tmp <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = i)
   rates[i] <- mean(tmp == df_test$suicide)
 }
 plot(x = (1:k_max), y = rates, xlab = "k", ylab = "Accuracy", type = "l")
@@ -572,21 +571,12 @@ best_k <- which.max(rates)
 ### Generalized Additive Model (GAM)
 GAMs extend traditional linear models by allowing for non-linear relationships between predictors and the response variable through the use of smooth functions. This flexibility enables the model to capture complex patterns in the data without assuming a specific parametric form.
 
-S() has bs="tp" by default
-
-Thin plate regression splines
-bs="tp". These are low rank isotropic smoothers of any number of covariates. By isotropic is meant that rotation of the covariate co-ordinate system will not change the result of smoothing. By low rank is meant that they have far fewer coefficients than there are data to smooth. They are reduced rank versions of the thin plate splines and use the thin plate spline penalty. They are the default smooth for s terms because there is a defined sense in which they are the optimal smoother of any given basis dimension/rank (Wood, 2003). Thin plate regression splines do not have ‘knots’ (at least not in any conventional sense): a truncated eigen-decomposition is used to achieve the rank reduction. See tprs for further details.
-
+In particular, the function `gam` of the R package `mgcv` by default include in the non linear model smooth terms using thin plate regression splines^[Thin plate regression splines are described in detail in Wood (2003), *Journal of the Royal Statistical Society: Series B (Statistical Methodology)*, 65(1), 95-114.], where the degree of smoothness is estimated as part of the fitting procedure.
 
 ```{r}
-df$suicide <- numeric_suicide
-df_train <- df[idx, ]
-df_test_gam <- df[-idx, ]
-
 # extract only the predictors from the formula and model the numeric one as smooth terms
 gam_formula <- formula(paste(
-  "I(suicide>threshold_suicide)",
-  "~",
+  "suicide~",
   paste(extract_predictors_in_vec(mod_step_bic$formula, general_cols), collapse = " + "),
   " + ",
   paste(
@@ -599,11 +589,13 @@ gam_formula <- formula(paste(
 
 mod_gam <- gam(gam_formula, family = binomial, data = df_train)
 summary(mod_gam)
+print(AIC(mod_gam))
 
-# Restore previous state
-df$suicide <- factor_suicide
-df_train <- df[idx, ]
 ```
+
+All the five smooth terms are considered significant according to the p-value and the model explain 36.8% of the deviance. In addition, the estimated effective degrees of freedom (edf) propose complex fits for all the predictors, indeed higher edf values suggest more flexibility in capturing non-linear effects.
+
+This GAM identifies significant non-linear relationships between several mental health factors and the likelihood of suicide attempts among students. Key contributors include psychiatric symptoms, sleeping disturbances, self-injury behaviors, compulsions, and hostile aggression. Each of these predictors exhibits a statistically significant and complex relationship with suicide risk, demonstrating the nuanced influence of mental health symptoms on the probability of suicide attempts. The model captures a moderate proportion of variability in suicide risk, emphasizing the importance of considering non-linear effects in understanding the predictors of suicide among students.
 
 
 ```{r}
@@ -705,7 +697,8 @@ print(coords_knn)
 ```
 
 ```{r message=FALSE, warning=FALSE}
-probs_gam <- predict(mod_gam, newdata = df_test_gam, type = "response")
-roc_gam <- roc(df_test_gam$suicide ~ probs_gam, plot = TRUE, print.auc = TRUE)
+probs_gam <- predict(mod_gam, newdata = df_test, type = "response")
+roc_gam <- roc(df_test$suicide ~ probs_gam, plot = TRUE, print.auc = TRUE)
 coords_gam <- coords(roc_gam, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
 print(coords_gam)
+```
