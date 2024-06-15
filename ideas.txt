@@ -39,6 +39,43 @@ TODO MODIFY THE CRITERIA HERE
 - The remaining variables (`psychiatric_symptoms`, `dependence`, `impulsivity`, `compulsion`, `sleeping_disturbance`, `hostile_aggression`, `self_injury_behaviors`, and `eating_problems`) are categorized in a similar manner, with the thresholds set based on the distribution of the data and the clinical significance of the symptoms.
 
 
+### Different model definition
+Try to exploit better the informations provided by the original numeric scale of suicide.
+For the binomial families the response can be specified in both ways:
+
+As a factor: ‘success’ is interpreted as the factor not having the first level (and hence usually of having the second level).
+
+As a two-column integer matrix: the first column gives the number of successes and the second the number of failures.
+```{r}
+df$scaled_suicide <- scaled_suicide
+mod_succ_fail_formula<-formula(
+  paste(
+  "cbind(scaled_suicide, (max(scaled_suicide) - scaled_suicide)) ~"
+  paste(extract_predictors_in_vec(mod_step_bic$formula, general_cols), collapse = " + "),
+  " + ",
+  paste(extract_predictors_in_vec(mod_step_bic$formula, symptoms_cols), collapse = "+"))
+)
+
+mod_succ_fail <- glm(mod_succ_fail_formula,
+  family = "binomial",
+  method = "brglmFit"
+  data = subset(df, select = -suicide)[idx, ]
+)
+summary(mod_succ_fail)
+
+
+# Restore previous state
+df$scaled_suicide <- NULL
+```
+
+```{r message=FALSE, warning=FALSE}
+probs_succ_fail <- predict(mod_succ_fail, newdata = df_test, type = "response")
+roc_succ_fail <- roc(df_test$suicide ~ probs_succ_fail, plot = TRUE, print.auc = TRUE)
+coords_succ_fail <- coords(roc_succ_fail, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
+print(coords_succ_fail)
+```
+
+
 
 <!-- ## Category aggregation -->
 <!-- Due to the discrete nature of the symptmoms numeric predictor, an attempt to aggregate them in 3 categories is performed. Specifically: -->

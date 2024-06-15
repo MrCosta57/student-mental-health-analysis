@@ -22,6 +22,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.align = "center")
 ```
 
 
@@ -52,16 +53,19 @@ The purposes of this analysis are inspecting the possible hidden patterns presen
 
 # Prerequirements
 ```{r results='FALSE', message=FALSE, warning=FALSE}
-set.seed(123) # set pseudorandom generator for reprocucibility
+# Configure the environment
+# options(digits = 4, scipen = 999)
+rm(list = ls())
+# Set seed for reprocucibility
+set.seed(123)
 
 # Load all the packages and install them if they are not present
 requirements <- c(
   "summarytools", "MASS", "effects", "pROC", "mgcv",
-  "glmnetUtils", "e1071", "class", “car”,
-  "stringr", "ggplot2", "reshape2", "scales", "comprehenr",
-  "randomForest", "dplyr", "ggcorrplot"
+  "glmnetUtils", "e1071", "class", "car", "brglm2",
+  "gridExtra", "grid", "stringr", "ggplot2", "reshape2", "scales", "comprehenr",
+  "dplyr", "ggcorrplot"
 )
-
 for (library_name in requirements) {
   if (!require(library_name, character.only = TRUE)) {
     install.packages(library_name, repos = "https://cloud.r-project.org")
@@ -70,12 +74,13 @@ for (library_name in requirements) {
 }
 # Import user defined functions
 source("utils.R")
+
 # library(styler)
 # style_file("analysis_report.Rmd")
 ```
 
 
-# First overview and data engineering
+# First overview
 
 In this section, exploratory data analysis (EDA) is performed to understand the dataset structure and identify any potential issues that need to be addressed. Also, variables are transformed into the appropriate format.
 
@@ -95,7 +100,6 @@ colnames(df)[colnames(df) == "internet.addiction"] <- "internet_addiction"
 colnames(df)[colnames(df) == "hostile.aggression"] <- "hostile_aggression"
 colnames(df)[colnames(df) == "self.injury.behaviors"] <- "self_injury_behaviors"
 colnames(df)[colnames(df) == "eating.problems"] <- "eating_problems"
-
 
 # Transforming variables into factors
 df$gender <- factor(df$gender,
@@ -132,9 +136,14 @@ df$grade <- factor(
     "Senior"
   )
 )
-
-general_cols <- c("gender", "whether_only_child", "birth_place", "family_economic_status", "major", "grade")
-symptoms_cols <- c("psychiatric_symptoms", "dependence", "impulsivity", "compulsion", "sleeping_disturbance", "internet_addiction", "hostile_aggression", "self_injury_behaviors", "eating_problems")
+general_cols <- c(
+  "gender", "whether_only_child", "birth_place",
+  "family_economic_status", "major", "grade"
+)
+symptoms_cols <- c(
+  "psychiatric_symptoms", "dependence", "impulsivity", "compulsion", "sleeping_disturbance",
+  "internet_addiction", "hostile_aggression", "self_injury_behaviors", "eating_problems"
+)
 ```
 
 ```{r}
@@ -173,15 +182,19 @@ In this sense, the values of *suicide* lower or equal to 9 take the value *FALSE
 
 ```{r}
 print(summary(df$suicide))
-
 threshold_suicide <- 9
 numeric_suicide <- df$suicide
-scaled_suicide <- numeric_suicide - min(numeric_suicide)
 factor_suicide <- as.factor(df$suicide > threshold_suicide)
 df$suicide <- factor_suicide
 
-print(summary(df$suicide))
+# Number of suicide
+print(table(df$suicide))
+# Percentage of suicide
+print(table(df$suicide) / nrow(df) * 100)
 ```
+
+Imposing this threshold for the response variable, the classes apperas highly unbalanced: indeed the proportion of negative suicide in the dataset is `r table(df$suicide)[0] / nrow(df) * 100`\% and the proportion of positive suicide is `r table(df$suicide)[0] / nrow(df) * 100`\%.
+Furthermore in the model developement section, some consideration on that will be stated.
 
 
 # Exploratory Data Analysis
@@ -190,7 +203,7 @@ After a first overview of the data, it's needed to inspect some possible relatio
 ## Frequencies concerning response variable
 
 ### General information columns
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in general_cols) {
   plot_freq_by_category(df, col, "suicide")
 }
@@ -200,7 +213,7 @@ Looking at the bar plots referring to the general information about the students
 Just for the grade *Freshmen* the number of suicides is higher than the other levels, and in particular, there are fewer suicides for lower grading. Also, the *grade* variable is possibly related to some age information that in the dataframe is not present and it could suggest that younger people are less prone to suicide ideal. 
 
 
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in general_cols) {
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -218,7 +231,7 @@ There are a few visible things in these visualizations:
 
 
 ### Symptoms information columns
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in symptoms_cols) {
   plot_freq_by_category(df, col, "suicide")
 }
@@ -226,7 +239,7 @@ for (col in symptoms_cols) {
 
 The histograms of the symptoms features show a slightly different behavior compared with the previous categorical predictors' plots. As observed in the beginning, the number of high-severity symptoms in general is low but the frequency of suicide gets bigger when these symptoms increase.
 
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
 for (col in symptoms_cols) {
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -237,7 +250,7 @@ Checking the proportion histograms divided by the response variable what was sta
 
 
 ## Numeric variables
-```{r fig.width=8, fig.height=4, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
 corr_matrix <- round(cor(df[, symptoms_cols]), 2)
 ggcorrplot(corr_matrix,
   hc.order = TRUE,
@@ -257,8 +270,9 @@ The correlation coefficient significance test is performed to check if for these
 
 $$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$$
 where \(r\) is the correlation coefficient and \(n\) is the number of observations. The null hypothesis is that the correlation coefficient is equal to zero, and the alternative hypothesis is that the correlation coefficient is not equal to zero. The degrees of freedom for the t-distribution are \(n-2\). The p-value is calculated as the probability of observing a t-statistic as extreme as the one calculated from the data, assuming the null hypothesis is true.
+
 ```{r}
-cor.test(df$impulsivity, df$compulsion)
+cor.test(df$impulsivity, df$compulsion)$p.value
 cor.test(df$dependence, df$impulsivity)
 cor.test(df$dependence, df$compulsion)
 cor.test(df$self_injury_behaviors, df$eating_problems)
@@ -281,6 +295,7 @@ In particular the following interactions are considered:
 - **Sleeping disturbance and major**: Different majors may have varying stress levels and workload demands, which can interact with sleep disturbances to affect academic performance and mental health uniquely in each field of study.
 
 - **Hostile aggression and birth place**: Cultural norms around aggression and conflict resolution can vary significantly by location, impacting how hostile aggression influences social relationships and legal issues in different birthplaces.
+
 ```{r}
 df$suicide <- numeric_suicide
 ```
@@ -341,19 +356,20 @@ In a statistical analysis, splitting data into training and testing sets is cruc
 The reference level for the categorical predictors in a full model is a female student with brothers/sisters, from the countryside with an extremely poor family, liberal major and postgraduate.
 
 ```{r}
-idx <- sample(nrow(df), 0.80 * nrow(df))
+idx <- sample(nrow(df), 0.8 * nrow(df))
 df_train <- df[idx, ]
 df_test <- df[-idx, ]
 
-# Training split dimension
-dim(df_train)
-# Testing split dimension
-dim(df_test)
+print(paste0("Train size: ", nrow(df_train)))
+print(paste0("Test size: ", nrow(df_test)))
 
 # Reference levels
 for (i in general_cols) {
   print(paste0(i, ": ", levels(df[, i])[1], sep = ""))
 }
+
+# Class proportion in training set
+print(table(df_train$suicide) / nrow(df_train) * 100)
 ```
 
 
@@ -363,11 +379,11 @@ The coefficients of this generalized linear model in this case represent the log
 
 ### Full model
 ```{r}
-mod_full <- glm(suicide ~ ., data = df_train, family = "binomial")
-summary(mod_full)
+mod_full_std <- glm(suicide ~ ., data = df_train, family = "binomial")
+summary(mod_full_std)
 ```
 
-Examining the model that includes all the variables, several predictors appear to be strongly significant. Notably, the intercept, which corresponds to the reference level and numeric predictors with coefficients of 0, has a log-odds value of `r mod_full$coefficients[1]`. When converted, this log-odds value represents a probability of `r exp(mod_full$coefficients[1])/(1-exp(mod_full$coefficients[1]))` for the response variable $\mathcal{P}(suicide)=\frac{e^{\beta_0}}{1+e^{\beta_0}}$.
+Examining the model that includes all the variables, several predictors appear to be strongly significant. Notably, the intercept, which corresponds to the reference level and numeric predictors with coefficients of 0, has a log-odds value of `r mod_full_std$coefficients[1]`. When converted, this log-odds value represents a probability of `r exp(mod_full_std$coefficients[1])/(1-exp(mod_full_std$coefficients[1]))` for the response variable $\mathcal{P}(suicide)=\frac{e^{\beta_0}}{1+e^{\beta_0}}$.
 
 
 In particular, the following model interpretation is considered:
@@ -379,18 +395,61 @@ In particular, the following model interpretation is considered:
 - All the symptoms predictor are significant of strongly significant except for eating_problems. Higher levels of psychiatric symptoms, impulsivity, compulsion, sleeping disturbances, internet addiction, hostile aggression, and self-injury behaviors are associated with increased log-odds of suicide. Dependence, however, shows a negative relationship, suggesting that higher dependence decreases the log-odds of suicide for these data.
 - The levels in whether only child and in major have high p-values for the significance test and they seem not influential
 
-The above interpretation can be also visualized by checking the effect plots, paying attention to the fact that now the y-axis is represented in the response scale (not the log-odds one)
-
 ```{r}
-for (i in general_cols) {
-  print(plot(effect(i, mod_full), ylab = "Probability of Suicide", rescale.axis = FALSE))
-}
+vif(mod_full_std)
+cook_dist <- cooks.distance(mod_full_std)
+# Plot using ggplot2
+ggplot(
+  data.frame(Index = 1:length(cook_dist), Cook = cook_dist),
+  aes(x = Index, y = Cook)
+) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Observation Index", y = "Cook's Distance") +
+  ggtitle("Cook's Distance for Each Observation") +
+  theme_minimal()
+cook_dist <- NULL
 ```
 
+The model don't show significantly signs of multicollinearity or infuential points
+
+
+Models fitted using standard Maximum likelihood method in this case where proportion of classes in response varible is very unbalanced could be not be suitable.
+Specifically, to overcome this problem, bias-corrected maximum likelihood^[Kosmidis, I., Kenne Pagui, E.C. & Sartori, N. Mean and median bias reduction in generalized linear models. Stat Comput 30, 43–59 (2020)] technique is utilized for estimating the coefficients of this logistic regression model in a robust manner.
+
 ```{r}
-for (i in symptoms_cols) {
-  print(plot(effect(i, mod_full), ylab = "Probability of Suicide", rescale.axis = FALSE))
+mod_zero_br <- glm(suicide ~ 1, data = df_train, family = "binomial", method = "brglmFit")
+mod_full_br <- glm(suicide ~ ., data = df_train, family = "binomial", method = "brglmFit")
+```
+```{r}
+tab <- cbind(coef(mod_full_std), coef(mod_full_br))
+colnames(tab) <- c("Vanilla Model", "Full Model")
+tab
+tab <- NULL
+```
+Models presents slightly differences in the coefficient estimations in this case, but due to the better theorictical properities of the bias reduction methods for logistic regression, this one is utilized for the analysis.
+
+
+The above interpretation can be also visualized by checking the effect plots, paying attention to the fact that now the y-axis is represented in the response scale (not the log-odds one)
+
+```{r fig.height=25, fig.width=18}
+plts <- list()
+for (i in general_cols) {
+  p <- plot(effect(i, mod_full_br), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  plts[[i]] <- p
 }
+grid.arrange(grobs = plts, top = textGrob("General features effect plots", gp = gpar(fontsize = 20, font = 3)))
+plts <- NULL
+```
+
+```{r fig.height=25, fig.width=18}
+plts <- list()
+for (i in symptoms_cols) {
+  p <- plot(effect(i, mod_full_br), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  plts[[i]] <- p
+}
+grid.arrange(grobs = plts, top = textGrob("Symptoms features effect plots", gp = gpar(fontsize = 20, font = 3)))
+plts <- NULL
 ```
 
 
@@ -405,7 +464,8 @@ mod_manual1_interaction <- glm(
     eating_problems + major + sleeping_disturbance +
     family_economic_status:eating_problems + major:sleeping_disturbance,
   data = df_train,
-  family = "binomial"
+  family = "binomial",
+  method = "brglmFit"
 )
 summary(mod_manual1_interaction)
 
@@ -413,11 +473,12 @@ mod_manual2 <- glm(
   suicide ~ gender + grade + birth_place + impulsivity + self_injury_behaviors +
     hostile_aggression + psychiatric_symptoms,
   data = df_train,
-  family = "binomial"
+  family = "binomial",
+  method = "brglmFit"
 )
 summary(mod_manual2)
 
-print(BIC(mod_full, mod_manual1_interaction, mod_manual2))
+print(BIC(mod_full_br, mod_manual1_interaction, mod_manual2))
 ```
 
 Including the interaction terms and the variables considered in the scatter plots seems to lead no benefit to the model because they appear not significant based on these data. Also, the BIC score that penalizes more the complex model, is higher compared with the model with all predictors. The second manual has all significant predictors, except for some levels in the variable grade. The information criteria is higher also in this case with respect to the full model.
@@ -430,8 +491,7 @@ Bidirectional Stepwise Regression, is a variable selection method that combines 
 
 ```{r}
 # AIC stepwise regression
-mod_zero <- glm(suicide ~ 1, data = df_train, family = "binomial")
-mod_step_aic <- stepAIC(mod_zero, direction = "both", scope = list(upper = formula(mod_full)), trace = 0)
+mod_step_aic <- stepAIC(mod_zero_br, direction = "both", scope = list(upper = formula(mod_full_br)), trace = 0)
 summary(mod_step_aic)
 ```
 
@@ -441,7 +501,7 @@ It's possible to try stepwise regression using BIC information criteria to selec
 
 ```{r}
 # BIC stepwise regression
-mod_step_bic <- stepAIC(mod_zero, direction = "both", scope = list(upper = formula(mod_full)), trace = 0, k = log(nrow(df_train)))
+mod_step_bic <- stepAIC(mod_zero_br, direction = "both", scope = list(upper = formula(mod_full_br)), trace = 0, k = log(nrow(df_train)))
 summary(mod_step_bic)
 ```
 
@@ -449,16 +509,24 @@ Both models consistently identify psychiatric symptoms, sleeping disturbance, se
 The AIC model as can be deducted includes additional significant predictors not present in the BIC model. The choice between the models depends on the preference for model complexity versus simplicity and the specific goals of the analysis.
 
 For completeness, effect plots from the stepwise regression model with AIC are provided:
-```{r}
+```{r fig.height=20, fig.width=18}
+plts <- list()
 for (i in extract_predictors_in_vec(mod_step_aic$formula, general_cols)) {
-  plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  p <- plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  plts[[i]] <- p
 }
+grid.arrange(grobs = plts, top = textGrob("General features effect plots", gp = gpar(fontsize = 20, font = 3)))
+plts <- NULL
 ```
 
-```{r}
+```{r fig.height=25, fig.width=18}
+plts <- list()
 for (i in extract_predictors_in_vec(mod_step_aic$formula, symptoms_cols)) {
-  plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  p <- plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
+  plts[[i]] <- p
 }
+grid.arrange(grobs = plts, top = textGrob("Symptoms features effect plots", gp = gpar(fontsize = 20, font = 3)))
+plts <- NULL
 ```
 
 
@@ -470,10 +538,10 @@ Notice that the implementation of Lasso in glmnetUtils library deliberately avoi
 
 
 ```{r}
-mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", alpha = 1, nfolds = 10)
+mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", method = "brglmFit", alpha = 1, nfolds = 10)
 beta_1se <- coef(mod_lasso, s = mod_lasso$lambda.1se)
 beta_1se_idx <- which(beta_1se[, 1] != 0)
-print(format(cbind(beta_1se_idx, beta_1se[beta_1se_idx])[, 2], scientific = FALSE))
+print(cbind(beta_1se_idx, beta_1se[beta_1se_idx])[, 2])
 print(sum(beta_1se[, 1] != 0))
 ```
 
@@ -548,11 +616,11 @@ The output of naiveBayes contains the estimated a-priori probabilities and a tab
 Another option is to use K-Nearest Neighbors (KNN) algorithm, a non-parametric method that works by finding the K closest data points in the training set to a given data point in the testing set and making predictions based on the most common class among its neighbors. It is a versatile and intuitive method but can be computationally expensive for large datasets.
 
 Also for KNN model the predictor used are the one selected by stepwise regression with BIC information criteria
-```{r}
+```{r fig.height=4, fig.width=8}
 # as.character(mod_step_bic$formula)[-2] extract the predictors and the tilde symbol from the formula
 knn_formula <- formula(paste(as.character(mod_step_bic$formula)[-2], collapse = ""))
 
-# Add a small noise to solve “too many ties in knn()” error
+# Add a small noise to solve "too many ties in knn()" error
 x.train <- model.matrix(knn_formula, data = subset(jitter_subset(df_train, symptoms_cols), select = -suicide))[, -1]
 x.test <- model.matrix(knn_formula, data = subset(jitter_subset(df_test, symptoms_cols), select = -suicide))[, -1]
 
@@ -560,11 +628,21 @@ k_max <- 3
 rates <- double(k_max)
 for (i in 1:k_max) {
   tmp <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = i)
-  rates[i] <- mean(tmp == df_test$suicide)
+  tp <- sum(tmp == TRUE & df_test$suicide == TRUE)
+  fn <- sum(tmp == FALSE & df_test$suicide == TRUE)
+  rates[i] <- tp / (tp + fn)
 }
-plot(x = (1:k_max), y = rates, xlab = "k", ylab = "Accuracy", type = "l")
+plot(
+  ggplot(data.frame(k = 1:k_max, specificities = rates), aes(x = k, y = specificities)) +
+    geom_line() +
+    geom_point() +
+    labs(x = "k", y = "Specificity") +
+    scale_x_continuous(breaks = 1:k_max) +
+    theme_minimal()
+)
 
 best_k <- which.max(rates)
+best_k
 ```
 
 
@@ -575,7 +653,7 @@ In particular, the function `gam` of the R package `mgcv` by default include in 
 
 ```{r}
 # extract only the predictors from the formula and model the numeric one as smooth terms
-gam_formula <- formula(paste(
+gam_formula_bic <- formula(paste(
   "suicide~",
   paste(extract_predictors_in_vec(mod_step_bic$formula, general_cols), collapse = " + "),
   " + ",
@@ -587,118 +665,147 @@ gam_formula <- formula(paste(
   )
 ))
 
-mod_gam <- gam(gam_formula, family = binomial, data = df_train)
-summary(mod_gam)
-print(AIC(mod_gam))
-
+mod_gam_bic <- gam(gam_formula_bic, family = binomial, data = df_train)
+summary(mod_gam_bic)
 ```
 
 All the five smooth terms are considered significant according to the p-value and the model explain 36.8% of the deviance. In addition, the estimated effective degrees of freedom (edf) propose complex fits for all the predictors, indeed higher edf values suggest more flexibility in capturing non-linear effects.
 
 This GAM identifies significant non-linear relationships between several mental health factors and the likelihood of suicide attempts among students. Key contributors include psychiatric symptoms, sleeping disturbances, self-injury behaviors, compulsions, and hostile aggression. Each of these predictors exhibits a statistically significant and complex relationship with suicide risk, demonstrating the nuanced influence of mental health symptoms on the probability of suicide attempts. The model captures a moderate proportion of variability in suicide risk, emphasizing the importance of considering non-linear effects in understanding the predictors of suicide among students.
 
-
-```{r}
-plot(mod_gam, shade = TRUE, shade.col = "lightblue")
+```{r fig.height=8, fig.width=15}
+par(mfrow = c(1, 2))
+plot(mod_gam_bic, shade = TRUE, shade.col = "lightblue")
+par(mfrow = c(1, 1))
 ```
 
 
-
-### Different model definition
-For the binomial families the response can be specified in both ways:
-
-As a factor: ‘success’ is interpreted as the factor not having the first level (and hence usually of having the second level).
-
-As a two-column integer matrix: the first column gives the number of successes and the second the number of failures.
 ```{r}
-df$scaled_suicide <- scaled_suicide
-mod_succ_fail <- glm(
-  cbind(scaled_suicide, (max(scaled_suicide) - scaled_suicide)) ~
-    .,
-  family = "binomial",
-  data = subset(df, select = -suicide)[idx, ]
-)
-summary(mod_succ_fail)
+# extract only the predictors from the formula and model the numeric one as smooth terms
+gam_formula_aic <- formula(paste(
+  "suicide~",
+  paste(extract_predictors_in_vec(mod_step_aic$formula, general_cols), collapse = " + "),
+  " + ",
+  paste(
+    "s(",
+    extract_predictors_in_vec(mod_step_aic$formula, symptoms_cols),
+    ")",
+    collapse = "+"
+  )
+))
 
-# Restore previous state
-df$scaled_suicide <- NULL
+mod_gam_aic <- gam(gam_formula_aic, family = binomial, data = df_train)
+summary(mod_gam_aic)
 ```
 
-```{r message=FALSE, warning=FALSE}
-probs_succ_fail <- predict(mod_succ_fail, newdata = df_test, type = "response")
-roc_succ_fail <- roc(df_test$suicide ~ probs_succ_fail, plot = TRUE, print.auc = TRUE)
-coords_succ_fail <- coords(roc_succ_fail, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_succ_fail)
+```{r fig.height=8, fig.width=15}
+par(mfrow = c(1, 2))
+plot(mod_gam_aic, shade = TRUE, shade.col = "lightblue")
+par(mfrow = c(1, 1))
+```
+
+```{r}
+AIC(mod_gam_bic, mod_gam_aic)
 ```
 
 
 # Model comparison
 The performance of the models is evaluated using the Area Under the Receiver Operating Characteristic Curve (AUC-ROC) metric, which measures the ability of the model to distinguish between the two classes. The higher the AUC-ROC value, the better the model's predictive performance. The optimal threshold for the response variable is determined by the point on the ROC curve that maximizes the Youden's J statistic, which balances the true positive and false positive rates.
 
+```{r}
+str_row_names <- c(
+  "Full std model", "Full br model", "Manual model 2", "Stepwise regression with AIC", "Stepwise regression with BIC",
+  "Lasso", "LDA", "QDA", "Naive Bayes", "KNN", "GAM with BIC", "GAM with AIC"
+)
+# Summary of the information criteria when available
+info_criteria <- cbind(
+  AIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_aic)[, 2],
+  BIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_aic)[, 2]
+)
+colnames(info_criteria) <- c("AIC", "BIC")
+rownames(info_criteria) <- str_row_names[c(2, 3, 4, 5, 11, 12)]
+info_criteria <- as.data.frame(info_criteria)
+```
+
+```{r}
+# Sort by best sensitivity (true positive rate)
+(info_criteria %>% arrange(AIC))[, c("AIC", "BIC")]
+```
+
 ```{r message=FALSE, warning=FALSE}
+probs_full_std <- predict(mod_full_std, newdata = df_test, type = "response")
+probs_full_br <- predict(mod_full_br, newdata = df_test, type = "response")
+probs_manual2 <- predict(mod_manual2, newdata = df_test, type = "response")
 probs_stepwise_aic <- predict(mod_step_aic, newdata = df_test, type = "response")
-roc_stepwise_aic <- roc(df_test$suicide ~ probs_stepwise_aic, plot = TRUE, print.auc = TRUE)
-coords_stepwise_aic <- coords(roc_stepwise_aic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_stepwise_aic)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_stepwise_bic <- predict(mod_step_bic, newdata = df_test, type = "response")
-roc_stepwise_bic <- roc(df_test$suicide ~ probs_stepwise_bic, plot = TRUE, print.auc = TRUE)
-coords_stepwise_bic <- coords(roc_stepwise_bic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_stepwise_bic)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_lasso <- predict(mod_lasso, newdata = df_test, s = mod_lasso$lambda.1se, type = "response")
-roc_lasso <- roc(df_test$suicide ~ as.vector(probs_lasso), plot = TRUE, print.auc = TRUE)
-coords_lasso <- coords(roc_lasso, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_lasso)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_lda <- predict(mod_lda, newdata = df_test)
-roc_lda <- roc(df_test$suicide ~ probs_lda$posterior[, 2], plot = TRUE, print.auc = TRUE)
-coords_lda <- coords(roc_lda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_lda)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_qda <- predict(mod_qda, newdata = df_test)
-roc_qda <- roc(df_test$suicide ~ probs_qda$posterior[, 2], plot = TRUE, print.auc = TRUE)
-coords_qda <- coords(roc_qda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_qda)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_nb <- predict(mod_nb, newdata = df_test, type = "raw")
-roc_nb <- roc(df_test$suicide ~ probs_nb[, 2], plot = TRUE, print.auc = TRUE)
-coords_nb <- coords(roc_nb, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_nb)
-```
-
-```{r message=FALSE, warning=FALSE}
 probs_knn <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = best_k)
-conf_matrix_knn <- table(df_test$suicide, probs_knn)
-# Calculate True Positives (TP), True Negatives (TN), False Positives (FP), False Negatives (FN)
-TP_knn <- conf_matrix_knn[2, 2] # True Positives
-TN_knn <- conf_matrix_knn[1, 1] # True Negatives
-FP_knn <- conf_matrix_knn[1, 2] # False Positives
-FN_knn <- conf_matrix_knn[2, 1] # False Negatives
+probs_gam_bic <- predict(mod_gam_bic, newdata = df_test, type = "response")
+probs_gam_aic <- predict(mod_gam_aic, newdata = df_test, type = "response")
+```
 
-# Specificity (True Negative Rate)
-specificity <- TN_knn / (TN_knn + FP_knn)
-# Sensitivity (Recall or True Positive Rate)
-sensitivity <- TP_knn / (TP_knn + FN_knn)
-# Accuracy
-accuracy <- (TP_knn + TN_knn) / sum(conf_matrix_knn)
-coords_knn <- data.frame(threshold = NA, specificity = specificity, sensitivity = sensitivity, accuracy = accuracy, tn = TN_knn, tp = TP_knn, fn = FN_knn, fp = FP_knn)
-print(coords_knn)
+```{r message=FALSE, warning=FALSE, fig.height=8, fig.width=15}
+par(mfrow = c(1, 2))
+roc_full_std <- roc(df_test$suicide ~ probs_full_std, plot = TRUE, print.auc = TRUE, main = "ROC curve for full std model")
+roc_full_br <- roc(df_test$suicide ~ probs_full_br, plot = TRUE, print.auc = TRUE, main = "ROC curve for full br model")
+roc_manual2 <- roc(df_test$suicide ~ probs_manual2, plot = TRUE, print.auc = TRUE, main = "ROC curve for manual model 2")
+roc_stepwise_aic <- roc(df_test$suicide ~ probs_stepwise_aic, plot = TRUE, print.auc = TRUE, main = "ROC curve for stepwise regression with AIC")
+roc_stepwise_bic <- roc(df_test$suicide ~ probs_stepwise_bic, plot = TRUE, print.auc = TRUE, main = "ROC curve for stepwise regression with BIC")
+roc_lasso <- roc(df_test$suicide ~ as.vector(probs_lasso), plot = TRUE, print.auc = TRUE, main = "ROC curve for Lasso")
+roc_lda <- roc(df_test$suicide ~ probs_lda$posterior[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for LDA")
+roc_qda <- roc(df_test$suicide ~ probs_qda$posterior[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for QDA")
+roc_nb <- roc(df_test$suicide ~ probs_nb[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for Naive Bayes")
+roc_gam_bic <- roc(df_test$suicide ~ probs_gam_bic, plot = TRUE, print.auc = TRUE, main = "ROC curve for GAM with BIC")
+roc_gam_aic <- roc(df_test$suicide ~ probs_gam_aic, plot = TRUE, print.auc = TRUE, main = "ROC curve for GAM with AIC")
+par(mfrow = c(1, 1))
 ```
 
 ```{r message=FALSE, warning=FALSE}
-probs_gam <- predict(mod_gam, newdata = df_test, type = "response")
-roc_gam <- roc(df_test$suicide ~ probs_gam, plot = TRUE, print.auc = TRUE)
-coords_gam <- coords(roc_gam, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp"))
-print(coords_gam)
+coords_full_std <- coords(roc_full_std, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_full_br <- coords(roc_full_br, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_manual2 <- coords(roc_manual2, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_stepwise_aic <- coords(roc_stepwise_aic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_stepwise_bic <- coords(roc_stepwise_bic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_lasso <- coords(roc_lasso, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_lda <- coords(roc_lda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_qda <- coords(roc_qda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_nb <- coords(roc_nb, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+conf_matrix_knn <- table(df_test$suicide, probs_knn)
+TP_knn <- conf_matrix_knn[2, 2]
+TN_knn <- conf_matrix_knn[1, 1]
+FP_knn <- conf_matrix_knn[1, 2]
+FN_knn <- conf_matrix_knn[2, 1]
+coords_knn <- data.frame(
+  threshold = -1, specificity = TN_knn / (TN_knn + FP_knn),
+  sensitivity = TP_knn / (TP_knn + FN_knn),
+  accuracy = (TP_knn + TN_knn) / sum(conf_matrix_knn)
+)
+coords_gam_bic <- coords(roc_gam_bic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+coords_gam_aic <- coords(roc_gam_aic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
+```
+
+```{r message=FALSE, warning=FALSE}
+metrics <- rbind(
+  coords_full_std,
+  coords_full_br,
+  coords_manual2,
+  coords_stepwise_aic,
+  coords_stepwise_bic,
+  coords_lasso,
+  coords_lda,
+  coords_qda,
+  coords_nb,
+  coords_knn,
+  coords_gam_bic,
+  coords_gam_aic
+)
+rownames(metrics) <- str_row_names
+```
+
+```{r}
+# Sort by best sensitivity (true positive rate)
+(metrics %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy", "threshold")]
 ```

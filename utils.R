@@ -29,13 +29,11 @@ var_name_to_intitle <- function(var_name) {
   return(paste(str_replace_all(var_name, "_", " "), sep = " "))
 }
 
-
 split_camel_case <- function(input_string) {
   # Use regular expression to split camel case
   result <- gsub("(?<=[a-z])(?=[A-Z])", " ", input_string, perl = TRUE)
   return(result)
 }
-
 
 reduce_df_categories_to3 <- function(df_src, col_name, thresholds, levels) {
   res <- factor(
@@ -48,7 +46,6 @@ reduce_df_categories_to3 <- function(df_src, col_name, thresholds, levels) {
   )
   return(res)
 }
-
 
 # Function to extract predictors from a formula that are in a given vector
 extract_predictors_in_vec <- function(formula, input_vector) {
@@ -82,7 +79,6 @@ plot_freq_by_category <- function(data, freq_var, binary_category) {
   }
 
   resp_label <- var_name_to_label(binary_category, "")
-
 
   # Create the plot
   p <- ggplot(
