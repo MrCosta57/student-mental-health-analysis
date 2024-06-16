@@ -59,7 +59,7 @@ jitter_subset <- function(data, cols, factor = 0.0001) {
 k_fold_cv <- function(
     model_formula, model_func, data, response_col_name = "suicide",
     is_generative = FALSE, is_knn = FALSE, is_nb = FALSE, is_glmnet = FALSE,
-    symptoms_cols = NULL, n_fold = 5, seed = 123, ...) {
+    symptoms_cols = NULL, n_fold = 5, ...) {
   # Ensure data is a dataframe
   if (!is.data.frame(data)) {
     stop("The data argument must be a dataframe.")
@@ -67,7 +67,6 @@ k_fold_cv <- function(
 
   # Number of observations
   n <- nrow(data)
-  set.seed(seed)
   folds <- sample(rep(1:n_fold, length = n))
 
   # Initialize variables to store results

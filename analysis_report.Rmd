@@ -636,7 +636,7 @@ knn_rates <- list()
 for (i in 1:k_max) {
   knn_rates[[i]] <- k_fold_cv(
     model_formula = knn_formula, model_func = class::knn, data = df_train,
-    is_knn = TRUE, seed = seed,
+    is_knn = TRUE,
     k = i, n_fold = num_k_fold, symptoms_cols = symptoms_cols
   )
 }
@@ -728,54 +728,54 @@ info_criteria <- as.data.frame(info_criteria)
 ```{r message=FALSE, warning=FALSE}
 metrics_val_full_std <- k_fold_cv(
   model_formula = mod_full_std$formula, model_func = stats::glm, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial"
 )
 metrics_val_full_br <- k_fold_cv(
   model_formula = mod_full_br$formula, model_func = stats::glm, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial", method = "brglmFit"
 )
 metrics_val_manual2 <- k_fold_cv(
   model_formula = mod_manual2$formula, model_func = stats::glm, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial", method = "brglmFit"
 )
 metrics_val_stepwise_aic <- k_fold_cv(
   model_formula = mod_step_aic$formula, model_func = stats::glm, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial", method = "brglmFit"
 )
 metrics_val_stepwise_bic <- k_fold_cv(
   model_formula = mod_step_bic$formula, model_func = stats::glm, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial", method = "brglmFit"
 )
 metrics_val_lasso <- k_fold_cv(
   model_formula = formula("suicide~."), model_func = glmnetUtils::glmnet, data = df_train,
-  n_fold = num_k_fold, seed = seed,
+  n_fold = num_k_fold,
   family = "binomial", method = "brglmFit", lambda = mod_lasso$lambda.1se, alpha = 1
 )
 metrics_val_lda <- k_fold_cv(
   model_formula = lda_formula, model_func = MASS::lda, data = df_train,
-  n_fold = num_k_fold, is_generative = TRUE, seed = seed
+  n_fold = num_k_fold, is_generative = TRUE
 )
 metrics_val_qda <- k_fold_cv(
   model_formula = qda_formula, model_func = MASS::qda, data = df_train,
-  n_fold = num_k_fold, is_generative = TRUE, seed = seed
+  n_fold = num_k_fold, is_generative = TRUE
 )
 metrics_val_nb <- k_fold_cv(
   model_formula = nb_formula, model_func = e1071::naiveBayes, data = df_train,
-  n_fold = num_k_fold, is_nb = TRUE, seed = seed
+  n_fold = num_k_fold, is_nb = TRUE
 )
 metrics_val_knn <- knn_rates[[best_knn_k]]
 metrics_val_gam_bic <- k_fold_cv(
   model_formula = mod_gam_bic$formula, model_func = mgcv::gam, data = df_train,
-  n_fold = num_k_fold, seed = seed, family = "binomial"
+  n_fold = num_k_fold, family = "binomial"
 )
 metrics_val_gam_manual <- k_fold_cv(
   model_formula = mod_gam_manual$formula, model_func = mgcv::gam, data = df_train,
-  n_fold = num_k_fold, seed = seed, family = "binomial"
+  n_fold = num_k_fold, family = "binomial"
 )
 ```
 
@@ -791,7 +791,7 @@ metrics_val_total <- as.data.frame(rbind(
   unlist(metrics_val_qda),
   unlist(metrics_val_nb),
   unlist(metrics_val_knn),
-  unlist(metrics_val_gam_bic)
+  unlist(metrics_val_gam_bic),
   unlist(metrics_val_gam_manual)
 ))
 colnames(metrics_val_total) <- c("threshold", "sensitivity", "auc", "specificity", "accuracy")
@@ -821,7 +821,7 @@ metrics_test_gam_manual <- evaluate_test_set(mod_gam_manual, df_test = df_test, 
 ```
 
 ```{r}
-metrics_test_total <- rbind(
+metrics_test_total <- as.data.frame(rbind(
   unlist(metrics_test_full_std),
   unlist(metrics_test_full_br),
   unlist(metrics_test_manual2),
@@ -834,7 +834,7 @@ metrics_test_total <- rbind(
   unlist(metrics_test_knn),
   unlist(metrics_test_gam_bic),
   unlist(metrics_test_gam_manual)
-)
+))
 colnames(metrics_test_total) <- c("sensitivity", "specificity", "accuracy")
 rownames(metrics_test_total) <- str_row_names
 ```
