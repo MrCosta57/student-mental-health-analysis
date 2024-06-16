@@ -57,7 +57,9 @@ The purposes of this analysis are inspecting the possible hidden patterns presen
 # options(digits = 4, scipen = 999)
 rm(list = ls())
 # Set seed for reprocucibility
-set.seed(123)
+seed <- 123
+num_k_fold <- 5
+set.seed(seed)
 
 # Load all the packages and install them if they are not present
 requirements <- c(
@@ -73,8 +75,8 @@ for (library_name in requirements) {
   }
 }
 # Import user defined functions
-source("utils.R")
-
+source("src/utils.R")
+source("src/plotting.R")
 # library(styler)
 # style_file("analysis_report.Rmd")
 ```
@@ -367,9 +369,15 @@ print(paste0("Test size: ", nrow(df_test)))
 for (i in general_cols) {
   print(paste0(i, ": ", levels(df[, i])[1], sep = ""))
 }
-
-# Class proportion in training set
+# Class frequency in the training set
+print(table(df_train$suicide))
+# Class proportion in the training set
 print(table(df_train$suicide) / nrow(df_train) * 100)
+
+# Class frequency in the test set
+print(table(df_test$suicide))
+# Class proportion in the test set
+print(table(df_test$suicide) / nrow(df_test) * 100)
 ```
 
 
@@ -538,7 +546,7 @@ Notice that the implementation of Lasso in glmnetUtils library deliberately avoi
 
 
 ```{r}
-mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", method = "brglmFit", alpha = 1, nfolds = 10)
+mod_lasso <- cv.glmnet(suicide ~ ., data = df_train, family = "binomial", method = "brglmFit", alpha = 1, nfolds = num_k_fold)
 beta_1se <- coef(mod_lasso, s = mod_lasso$lambda.1se)
 beta_1se_idx <- which(beta_1se[, 1] != 0)
 print(cbind(beta_1se_idx, beta_1se[beta_1se_idx])[, 2])
@@ -585,7 +593,8 @@ To enhance interpretability for all the generative models, the preditors selecte
 ### Linear Discriminant Analysis (LDA)
 The LDA model assumes that the predictors are normally distributed and that the covariance matrices are equal across classes. 
 ```{r}
-mod_lda <- lda(mod_step_bic$formula, data = df_train)
+lda_formula <- mod_step_bic$formula
+mod_lda <- lda(lda_formula, data = df_train)
 mod_lda
 ```
 The printed output of LDA includes the a-priori probabilities of suicide and the group means.<br/>
@@ -596,7 +605,8 @@ The proportion of training observation that belongs to positive suicide variable
 The QDA model generalizes the LDA assuming different covariance matrices for each class, so the flexibility is increased but the number of parameters to estimate is much larger
 
 ```{r}
-mod_qda <- qda(mod_step_bic$formula, data = df_train)
+qda_formula <- mod_step_bic$formula
+mod_qda <- qda(qda_formula, data = df_train)
 mod_qda
 ```
 
@@ -604,7 +614,8 @@ mod_qda
 Naive Bayes instead make the assumption of independence between the predictors to estimate the class-specific densities, this assumption usually introduces bias but reduces the variance component of the error. The standard naive Bayes classifier for estimating univariate class densities of quantitative predictors assumes Gaussian distribution (likelihood component)
 
 ```{r}
-mod_nb <- naiveBayes(mod_step_bic$formula, data = df_train)
+nb_formula <- mod_step_bic$formula
+mod_nb <- naiveBayes(nb_formula, data = df_train)
 mod_nb
 ```
 The output of naiveBayes contains the estimated a-priori probabilities and a table containing the mean and standard deviation of the numeric variables, conditioned by the response.
@@ -620,29 +631,24 @@ Also for KNN model the predictor used are the one selected by stepwise regressio
 # as.character(mod_step_bic$formula)[-2] extract the predictors and the tilde symbol from the formula
 knn_formula <- formula(paste(as.character(mod_step_bic$formula)[-2], collapse = ""))
 
-# Add a small noise to solve "too many ties in knn()" error
-x.train <- model.matrix(knn_formula, data = subset(jitter_subset(df_train, symptoms_cols), select = -suicide))[, -1]
-x.test <- model.matrix(knn_formula, data = subset(jitter_subset(df_test, symptoms_cols), select = -suicide))[, -1]
-
 k_max <- 3
-rates <- double(k_max)
+knn_rates <- list()
 for (i in 1:k_max) {
-  tmp <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = i)
-  tp <- sum(tmp == TRUE & df_test$suicide == TRUE)
-  fn <- sum(tmp == FALSE & df_test$suicide == TRUE)
-  rates[i] <- tp / (tp + fn)
+  knn_rates[[i]] <- k_fold_cv(
+    model_formula = knn_formula, model_func = class::knn, data = df_train,
+    is_knn = TRUE, seed = seed,
+    k = i, n_fold = num_k_fold, symptoms_cols = symptoms_cols
+  )
 }
-plot(
-  ggplot(data.frame(k = 1:k_max, specificities = rates), aes(x = k, y = specificities)) +
-    geom_line() +
-    geom_point() +
-    labs(x = "k", y = "Specificity") +
-    scale_x_continuous(breaks = 1:k_max) +
-    theme_minimal()
-)
-
-best_k <- which.max(rates)
-best_k
+best_knn_k <- NULL
+best_knn_sensitivity <- -1
+for (i in 1:k_max) {
+  if (knn_rates[[i]][["mean_sensitivity"]] > best_knn_sensitivity) {
+    best_knn_k <- i
+    best_knn_sensitivity <- knn_rates[[i]][["mean_sensitivity"]]
+  }
+}
+print(paste("Best k value:", best_knn_k, ",", "Best sensitivity value:", best_knn_sensitivity, sep = " "))
 ```
 
 
@@ -665,7 +671,7 @@ gam_formula_bic <- formula(paste(
   )
 ))
 
-mod_gam_bic <- gam(gam_formula_bic, family = binomial, data = df_train)
+mod_gam_bic <- gam(gam_formula_bic, family = "binomial", data = df_train)
 summary(mod_gam_bic)
 ```
 
@@ -681,31 +687,18 @@ par(mfrow = c(1, 1))
 
 
 ```{r}
-# extract only the predictors from the formula and model the numeric one as smooth terms
-gam_formula_aic <- formula(paste(
-  "suicide~",
-  paste(extract_predictors_in_vec(mod_step_aic$formula, general_cols), collapse = " + "),
-  " + ",
-  paste(
-    "s(",
-    extract_predictors_in_vec(mod_step_aic$formula, symptoms_cols),
-    ")",
-    collapse = "+"
-  )
-))
-
-mod_gam_aic <- gam(gam_formula_aic, family = binomial, data = df_train)
-summary(mod_gam_aic)
+mod_gam_manual <- update(mod_gam_bic, . ~ . + grade + birth_place)
+summary(mod_gam_manual)
 ```
 
 ```{r fig.height=8, fig.width=15}
 par(mfrow = c(1, 2))
-plot(mod_gam_aic, shade = TRUE, shade.col = "lightblue")
+plot(mod_gam_manual, shade = TRUE, shade.col = "lightblue")
 par(mfrow = c(1, 1))
 ```
 
 ```{r}
-AIC(mod_gam_bic, mod_gam_aic)
+AIC(mod_gam_bic, mod_gam_manual)
 ```
 
 
@@ -715,12 +708,12 @@ The performance of the models is evaluated using the Area Under the Receiver Ope
 ```{r}
 str_row_names <- c(
   "Full std model", "Full br model", "Manual model 2", "Stepwise regression with AIC", "Stepwise regression with BIC",
-  "Lasso", "LDA", "QDA", "Naive Bayes", "KNN", "GAM with BIC", "GAM with AIC"
+  "Lasso", "LDA", "QDA", "Naive Bayes", "KNN", "GAM with BIC", "GAM ma"
 )
 # Summary of the information criteria when available
 info_criteria <- cbind(
-  AIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_aic)[, 2],
-  BIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_aic)[, 2]
+  AIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_manual)[, 2],
+  BIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_manual)[, 2]
 )
 colnames(info_criteria) <- c("AIC", "BIC")
 rownames(info_criteria) <- str_row_names[c(2, 3, 4, 5, 11, 12)]
@@ -733,79 +726,120 @@ info_criteria <- as.data.frame(info_criteria)
 ```
 
 ```{r message=FALSE, warning=FALSE}
-probs_full_std <- predict(mod_full_std, newdata = df_test, type = "response")
-probs_full_br <- predict(mod_full_br, newdata = df_test, type = "response")
-probs_manual2 <- predict(mod_manual2, newdata = df_test, type = "response")
-probs_stepwise_aic <- predict(mod_step_aic, newdata = df_test, type = "response")
-probs_stepwise_bic <- predict(mod_step_bic, newdata = df_test, type = "response")
-probs_lasso <- predict(mod_lasso, newdata = df_test, s = mod_lasso$lambda.1se, type = "response")
-probs_lda <- predict(mod_lda, newdata = df_test)
-probs_qda <- predict(mod_qda, newdata = df_test)
-probs_nb <- predict(mod_nb, newdata = df_test, type = "raw")
-probs_knn <- knn(train = x.train, test = x.test, cl = df_train$suicide, k = best_k)
-probs_gam_bic <- predict(mod_gam_bic, newdata = df_test, type = "response")
-probs_gam_aic <- predict(mod_gam_aic, newdata = df_test, type = "response")
-```
-
-```{r message=FALSE, warning=FALSE, fig.height=8, fig.width=15}
-par(mfrow = c(1, 2))
-roc_full_std <- roc(df_test$suicide ~ probs_full_std, plot = TRUE, print.auc = TRUE, main = "ROC curve for full std model")
-roc_full_br <- roc(df_test$suicide ~ probs_full_br, plot = TRUE, print.auc = TRUE, main = "ROC curve for full br model")
-roc_manual2 <- roc(df_test$suicide ~ probs_manual2, plot = TRUE, print.auc = TRUE, main = "ROC curve for manual model 2")
-roc_stepwise_aic <- roc(df_test$suicide ~ probs_stepwise_aic, plot = TRUE, print.auc = TRUE, main = "ROC curve for stepwise regression with AIC")
-roc_stepwise_bic <- roc(df_test$suicide ~ probs_stepwise_bic, plot = TRUE, print.auc = TRUE, main = "ROC curve for stepwise regression with BIC")
-roc_lasso <- roc(df_test$suicide ~ as.vector(probs_lasso), plot = TRUE, print.auc = TRUE, main = "ROC curve for Lasso")
-roc_lda <- roc(df_test$suicide ~ probs_lda$posterior[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for LDA")
-roc_qda <- roc(df_test$suicide ~ probs_qda$posterior[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for QDA")
-roc_nb <- roc(df_test$suicide ~ probs_nb[, 2], plot = TRUE, print.auc = TRUE, main = "ROC curve for Naive Bayes")
-roc_gam_bic <- roc(df_test$suicide ~ probs_gam_bic, plot = TRUE, print.auc = TRUE, main = "ROC curve for GAM with BIC")
-roc_gam_aic <- roc(df_test$suicide ~ probs_gam_aic, plot = TRUE, print.auc = TRUE, main = "ROC curve for GAM with AIC")
-par(mfrow = c(1, 1))
+metrics_val_full_std <- k_fold_cv(
+  model_formula = mod_full_std$formula, model_func = stats::glm, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial"
+)
+metrics_val_full_br <- k_fold_cv(
+  model_formula = mod_full_br$formula, model_func = stats::glm, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial", method = "brglmFit"
+)
+metrics_val_manual2 <- k_fold_cv(
+  model_formula = mod_manual2$formula, model_func = stats::glm, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial", method = "brglmFit"
+)
+metrics_val_stepwise_aic <- k_fold_cv(
+  model_formula = mod_step_aic$formula, model_func = stats::glm, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial", method = "brglmFit"
+)
+metrics_val_stepwise_bic <- k_fold_cv(
+  model_formula = mod_step_bic$formula, model_func = stats::glm, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial", method = "brglmFit"
+)
+metrics_val_lasso <- k_fold_cv(
+  model_formula = formula("suicide~."), model_func = glmnetUtils::glmnet, data = df_train,
+  n_fold = num_k_fold, seed = seed,
+  family = "binomial", method = "brglmFit", lambda = mod_lasso$lambda.1se, alpha = 1
+)
+metrics_val_lda <- k_fold_cv(
+  model_formula = lda_formula, model_func = MASS::lda, data = df_train,
+  n_fold = num_k_fold, is_generative = TRUE, seed = seed
+)
+metrics_val_qda <- k_fold_cv(
+  model_formula = qda_formula, model_func = MASS::qda, data = df_train,
+  n_fold = num_k_fold, is_generative = TRUE, seed = seed
+)
+metrics_val_nb <- k_fold_cv(
+  model_formula = nb_formula, model_func = e1071::naiveBayes, data = df_train,
+  n_fold = num_k_fold, is_nb = TRUE, seed = seed
+)
+metrics_val_knn <- knn_rates[[best_knn_k]]
+metrics_val_gam_bic <- k_fold_cv(
+  model_formula = mod_gam_bic$formula, model_func = mgcv::gam, data = df_train,
+  n_fold = num_k_fold, seed = seed, family = "binomial"
+)
+metrics_val_gam_manual <- k_fold_cv(
+  model_formula = mod_gam_manual$formula, model_func = mgcv::gam, data = df_train,
+  n_fold = num_k_fold, seed = seed, family = "binomial"
+)
 ```
 
 ```{r message=FALSE, warning=FALSE}
-coords_full_std <- coords(roc_full_std, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_full_br <- coords(roc_full_br, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_manual2 <- coords(roc_manual2, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_stepwise_aic <- coords(roc_stepwise_aic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_stepwise_bic <- coords(roc_stepwise_bic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_lasso <- coords(roc_lasso, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_lda <- coords(roc_lda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_qda <- coords(roc_qda, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_nb <- coords(roc_nb, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-conf_matrix_knn <- table(df_test$suicide, probs_knn)
-TP_knn <- conf_matrix_knn[2, 2]
-TN_knn <- conf_matrix_knn[1, 1]
-FP_knn <- conf_matrix_knn[1, 2]
-FN_knn <- conf_matrix_knn[2, 1]
-coords_knn <- data.frame(
-  threshold = -1, specificity = TN_knn / (TN_knn + FP_knn),
-  sensitivity = TP_knn / (TP_knn + FN_knn),
-  accuracy = (TP_knn + TN_knn) / sum(conf_matrix_knn)
-)
-coords_gam_bic <- coords(roc_gam_bic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-coords_gam_aic <- coords(roc_gam_aic, x = "best", ret = c("threshold", "specificity", "sensitivity", "accuracy"))
-```
-
-```{r message=FALSE, warning=FALSE}
-metrics <- rbind(
-  coords_full_std,
-  coords_full_br,
-  coords_manual2,
-  coords_stepwise_aic,
-  coords_stepwise_bic,
-  coords_lasso,
-  coords_lda,
-  coords_qda,
-  coords_nb,
-  coords_knn,
-  coords_gam_bic,
-  coords_gam_aic
-)
-rownames(metrics) <- str_row_names
+metrics_val_total <- as.data.frame(rbind(
+  unlist(metrics_val_full_std),
+  unlist(metrics_val_full_br),
+  unlist(metrics_val_manual2),
+  unlist(metrics_val_stepwise_aic),
+  unlist(metrics_val_stepwise_bic),
+  unlist(metrics_val_lasso),
+  unlist(metrics_val_lda),
+  unlist(metrics_val_qda),
+  unlist(metrics_val_nb),
+  unlist(metrics_val_knn),
+  unlist(metrics_val_gam_bic)
+  unlist(metrics_val_gam_manual)
+))
+colnames(metrics_val_total) <- c("threshold", "sensitivity", "auc", "specificity", "accuracy")
+rownames(metrics_val_total) <- str_row_names
 ```
 
 ```{r}
 # Sort by best sensitivity (true positive rate)
-(metrics %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy", "threshold")]
+(metrics_val_total %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy", "threshold")]
+```
+
+
+
+```{r}
+metrics_test_full_std <- evaluate_test_set(model = mod_full_std, df_test = df_test, threshold = metrics_val_full_std[["mean_threshold"]])
+metrics_test_full_br <- evaluate_test_set(mod_full_br, df_test = df_test, threshold = metrics_val_full_br[["mean_threshold"]])
+metrics_test_manual2 <- evaluate_test_set(mod_manual2, df_test = df_test, threshold = metrics_val_manual2[["mean_threshold"]])
+metrics_test_stepwise_aic <- evaluate_test_set(mod_step_aic, df_test = df_test, threshold = metrics_val_stepwise_aic[["mean_threshold"]])
+metrics_test_stepwise_bic <- evaluate_test_set(mod_step_bic, df_test = df_test, threshold = metrics_val_stepwise_bic[["mean_threshold"]])
+metrics_test_lasso <- evaluate_test_set(mod_lasso, df_test = df_test, threshold = metrics_val_lasso[["mean_threshold"]])
+metrics_test_lda <- evaluate_test_set(mod_lda, df_test = df_test, threshold = metrics_val_lda[["mean_threshold"]])
+metrics_test_qda <- evaluate_test_set(mod_qda, df_test = df_test, threshold = metrics_val_qda[["mean_threshold"]])
+metrics_test_nb <- evaluate_test_set(mod_nb, df_test = df_test, threshold = metrics_val_nb[["mean_threshold"]])
+metrics_test_knn <- evaluate_test_set(mod_knn, df_test = df_test, threshold = metrics_val_knn[["mean_threshold"]])
+metrics_test_gam_bic <- evaluate_test_set(mod_gam_bic, df_test = df_test, threshold = metrics_val_gam_bic[["mean_threshold"]])
+metrics_test_gam_manual <- evaluate_test_set(mod_gam_manual, df_test = df_test, threshold = metrics_val_gam_manual[["mean_threshold"]])
+```
+
+```{r}
+metrics_test_total <- rbind(
+  unlist(metrics_test_full_std),
+  unlist(metrics_test_full_br),
+  unlist(metrics_test_manual2),
+  unlist(metrics_test_stepwise_aic),
+  unlist(metrics_test_stepwise_bic),
+  unlist(metrics_test_lasso),
+  unlist(metrics_test_lda),
+  unlist(metrics_test_qda),
+  unlist(metrics_test_nb),
+  unlist(metrics_test_knn),
+  unlist(metrics_test_gam_bic),
+  unlist(metrics_test_gam_manual)
+)
+colnames(metrics_test_total) <- c("sensitivity", "specificity", "accuracy")
+rownames(metrics_test_total) <- str_row_names
+```
+
+```{r}
+# Sort by best sensitivity (true positive rate)
+(metrics_test_total %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy")]
 ```
