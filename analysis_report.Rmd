@@ -205,7 +205,7 @@ After a first overview of the data, it's needed to inspect some possible relatio
 ## Frequencies concerning response variable
 
 ### General information columns
-```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, echo=FALSE}
 for (col in general_cols) {
   plot_freq_by_category(df, col, "suicide")
 }
@@ -215,7 +215,7 @@ Looking at the bar plots referring to the general information about the students
 Just for the grade *Freshmen* the number of suicides is higher than the other levels, and in particular, there are fewer suicides for lower grading. Also, the *grade* variable is possibly related to some age information that in the dataframe is not present and it could suggest that younger people are less prone to suicide ideal. 
 
 
-```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, echo=FALSE}
 for (col in general_cols) {
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -233,7 +233,7 @@ There are a few visible things in these visualizations:
 
 
 ### Symptoms information columns
-```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, echo=FALSE}
 for (col in symptoms_cols) {
   plot_freq_by_category(df, col, "suicide")
 }
@@ -241,7 +241,7 @@ for (col in symptoms_cols) {
 
 The histograms of the symptoms features show a slightly different behavior compared with the previous categorical predictors' plots. As observed in the beginning, the number of high-severity symptoms in general is low but the frequency of suicide gets bigger when these symptoms increase.
 
-```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, echo=FALSE}
 for (col in symptoms_cols) {
   plot_proportion_by_category(df, col, "suicide")
 }
@@ -252,7 +252,7 @@ Checking the proportion histograms divided by the response variable what was sta
 
 
 ## Numeric variables
-```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE, echo=FALSE}
+```{r fig.height=4, fig.width=8, echo=FALSE}
 corr_matrix <- round(cor(df[, symptoms_cols]), 2)
 ggcorrplot(corr_matrix,
   hc.order = TRUE,
@@ -302,7 +302,7 @@ In particular the following interactions are considered:
 df$suicide <- numeric_suicide
 ```
 
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r echo=FALSE}
 ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = gender)) +
@@ -312,8 +312,7 @@ ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
     y = "Suicide"
   )
 ```
-
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r echo=FALSE}
 ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = family_economic_status)) +
@@ -323,8 +322,7 @@ ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)
     y = "Suicide"
   )
 ```
-
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r echo=FALSE}
 ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = major)) +
@@ -334,8 +332,7 @@ ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
     y = "Suicide"
   )
 ```
-
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r echo=FALSE}
 ggplot(df, aes(x = hostile_aggression, y = suicide, color = birth_place)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = birth_place)) +
@@ -440,7 +437,7 @@ Models presents slightly differences in the coefficient estimations in this case
 
 The above interpretation can be also visualized by checking the effect plots, paying attention to the fact that now the y-axis is represented in the response scale (not the log-odds one)
 
-```{r fig.height=25, fig.width=18}
+```{r fig.height=23, fig.width=15}
 plts <- list()
 for (i in general_cols) {
   p <- plot(effect(i, mod_full_br), ylab = "Probability of Suicide", rescale.axis = FALSE)
@@ -450,7 +447,7 @@ grid.arrange(grobs = plts, top = textGrob("General features effect plots", gp = 
 plts <- NULL
 ```
 
-```{r fig.height=25, fig.width=18}
+```{r fig.height=23, fig.width=18}
 plts <- list()
 for (i in symptoms_cols) {
   p <- plot(effect(i, mod_full_br), ylab = "Probability of Suicide", rescale.axis = FALSE)
@@ -517,7 +514,7 @@ Both models consistently identify psychiatric symptoms, sleeping disturbance, se
 The AIC model as can be deducted includes additional significant predictors not present in the BIC model. The choice between the models depends on the preference for model complexity versus simplicity and the specific goals of the analysis.
 
 For completeness, effect plots from the stepwise regression model with AIC are provided:
-```{r fig.height=20, fig.width=18}
+```{r fig.height=18, fig.width=15}
 plts <- list()
 for (i in extract_predictors_in_vec(mod_step_aic$formula, general_cols)) {
   p <- plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
@@ -527,7 +524,7 @@ grid.arrange(grobs = plts, top = textGrob("General features effect plots", gp = 
 plts <- NULL
 ```
 
-```{r fig.height=25, fig.width=18}
+```{r fig.height=23, fig.width=18}
 plts <- list()
 for (i in extract_predictors_in_vec(mod_step_aic$formula, symptoms_cols)) {
   p <- plot(effect(i, mod_step_aic), ylab = "Probability of Suicide", rescale.axis = FALSE)
@@ -623,35 +620,6 @@ The output of naiveBayes contains the estimated a-priori probabilities and a tab
 
 ## Other models
 
-### KNN
-Another option is to use K-Nearest Neighbors (KNN) algorithm, a non-parametric method that works by finding the K closest data points in the training set to a given data point in the testing set and making predictions based on the most common class among its neighbors. It is a versatile and intuitive method but can be computationally expensive for large datasets.
-
-Also for KNN model the predictor used are the one selected by stepwise regression with BIC information criteria
-```{r fig.height=4, fig.width=8}
-# as.character(mod_step_bic$formula)[-2] extract the predictors and the tilde symbol from the formula
-knn_formula <- formula(paste(as.character(mod_step_bic$formula)[-2], collapse = ""))
-
-k_max <- 3
-knn_rates <- list()
-for (i in 1:k_max) {
-  knn_rates[[i]] <- k_fold_cv(
-    model_formula = knn_formula, model_func = class::knn, data = df_train,
-    is_knn = TRUE,
-    k = i, n_fold = num_k_fold, symptoms_cols = symptoms_cols
-  )
-}
-best_knn_k <- NULL
-best_knn_sensitivity <- -1
-for (i in 1:k_max) {
-  if (knn_rates[[i]][["mean_sensitivity"]] > best_knn_sensitivity) {
-    best_knn_k <- i
-    best_knn_sensitivity <- knn_rates[[i]][["mean_sensitivity"]]
-  }
-}
-print(paste("Best k value:", best_knn_k, ",", "Best sensitivity value:", best_knn_sensitivity, sep = " "))
-```
-
-
 ### Generalized Additive Model (GAM)
 GAMs extend traditional linear models by allowing for non-linear relationships between predictors and the response variable through the use of smooth functions. This flexibility enables the model to capture complex patterns in the data without assuming a specific parametric form.
 
@@ -687,7 +655,7 @@ par(mfrow = c(1, 1))
 
 
 ```{r}
-mod_gam_manual <- update(mod_gam_bic, . ~ . + grade + birth_place)
+mod_gam_manual <- update(mod_gam_bic, . ~ . + grade + birth_place + s(impulsivity))
 summary(mod_gam_manual)
 ```
 
@@ -708,16 +676,15 @@ The performance of the models is evaluated using the Area Under the Receiver Ope
 ```{r}
 str_row_names <- c(
   "Full std model", "Full br model", "Manual model 2", "Stepwise regression with AIC", "Stepwise regression with BIC",
-  "Lasso", "LDA", "QDA", "Naive Bayes", "KNN", "GAM with BIC", "GAM ma"
+  "Lasso", "LDA", "QDA", "Naive Bayes", "GAM with BIC", "GAM manual"
 )
 # Summary of the information criteria when available
-info_criteria <- cbind(
+info_criteria <- as.data.frame(cbind(
   AIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_manual)[, 2],
   BIC(mod_full_br, mod_manual2, mod_step_aic, mod_step_bic, mod_gam_bic, mod_gam_manual)[, 2]
-)
+))
 colnames(info_criteria) <- c("AIC", "BIC")
-rownames(info_criteria) <- str_row_names[c(2, 3, 4, 5, 11, 12)]
-info_criteria <- as.data.frame(info_criteria)
+rownames(info_criteria) <- str_row_names[c(1, 2, 3, 4, 5, 10, 11)]
 ```
 
 ```{r}
@@ -768,7 +735,6 @@ metrics_val_nb <- k_fold_cv(
   model_formula = nb_formula, model_func = e1071::naiveBayes, data = df_train,
   n_fold = num_k_fold, is_nb = TRUE
 )
-metrics_val_knn <- knn_rates[[best_knn_k]]
 metrics_val_gam_bic <- k_fold_cv(
   model_formula = mod_gam_bic$formula, model_func = mgcv::gam, data = df_train,
   n_fold = num_k_fold, family = "binomial"
@@ -790,7 +756,6 @@ metrics_val_total <- as.data.frame(rbind(
   unlist(metrics_val_lda),
   unlist(metrics_val_qda),
   unlist(metrics_val_nb),
-  unlist(metrics_val_knn),
   unlist(metrics_val_gam_bic),
   unlist(metrics_val_gam_manual)
 ))
@@ -812,10 +777,9 @@ metrics_test_manual2 <- evaluate_test_set(mod_manual2, df_test = df_test, thresh
 metrics_test_stepwise_aic <- evaluate_test_set(mod_step_aic, df_test = df_test, threshold = metrics_val_stepwise_aic[["mean_threshold"]])
 metrics_test_stepwise_bic <- evaluate_test_set(mod_step_bic, df_test = df_test, threshold = metrics_val_stepwise_bic[["mean_threshold"]])
 metrics_test_lasso <- evaluate_test_set(mod_lasso, df_test = df_test, threshold = metrics_val_lasso[["mean_threshold"]])
-metrics_test_lda <- evaluate_test_set(mod_lda, df_test = df_test, threshold = metrics_val_lda[["mean_threshold"]])
-metrics_test_qda <- evaluate_test_set(mod_qda, df_test = df_test, threshold = metrics_val_qda[["mean_threshold"]])
-metrics_test_nb <- evaluate_test_set(mod_nb, df_test = df_test, threshold = metrics_val_nb[["mean_threshold"]])
-metrics_test_knn <- evaluate_test_set(mod_knn, df_test = df_test, threshold = metrics_val_knn[["mean_threshold"]])
+metrics_test_lda <- evaluate_test_set(mod_lda, df_test = df_test, threshold = metrics_val_lda[["mean_threshold"]], is_generative = TRUE)
+metrics_test_qda <- evaluate_test_set(mod_qda, df_test = df_test, threshold = metrics_val_qda[["mean_threshold"]], is_generative = TRUE)
+metrics_test_nb <- evaluate_test_set(mod_nb, df_test = df_test, threshold = metrics_val_nb[["mean_threshold"]], is_nb = TRUE)
 metrics_test_gam_bic <- evaluate_test_set(mod_gam_bic, df_test = df_test, threshold = metrics_val_gam_bic[["mean_threshold"]])
 metrics_test_gam_manual <- evaluate_test_set(mod_gam_manual, df_test = df_test, threshold = metrics_val_gam_manual[["mean_threshold"]])
 ```
@@ -831,7 +795,6 @@ metrics_test_total <- as.data.frame(rbind(
   unlist(metrics_test_lda),
   unlist(metrics_test_qda),
   unlist(metrics_test_nb),
-  unlist(metrics_test_knn),
   unlist(metrics_test_gam_bic),
   unlist(metrics_test_gam_manual)
 ))
