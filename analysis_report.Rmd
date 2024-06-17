@@ -808,8 +808,8 @@ rownames(metrics_test_total) <- str_row_names
 (metrics_test_total %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy")]
 ```
 
-Considering instead the scores obtained on the test set, the situation changes a bit
+Considering instead the scores obtained on the test set, the situation changes a bit:
 
-- Indeed the GAM model with BIC formula reaches a very high sensitivity score.
+- Indeed the GAM model with BIC formula reaches a very high sensitivity score
 - The model fitted on all the predictors reach almost a score similar to the previous one but maybe the overfits a bit on the data, considering this results
-- Impressively Naive Bayes obtain a high sensitivity score: maybe for this dataset the assumption of the independence between variables are not so incorrect.
+- Impressively Naive Bayes obtain a high sensitivity score: maybe for this dataset the assumption of the independence between variables are not so incorrect

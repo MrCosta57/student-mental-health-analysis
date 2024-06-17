@@ -58,7 +58,7 @@ jitter_subset <- function(data, cols, factor = 0.0001) {
 # Define the k-fold cross-validation function
 k_fold_cv <- function(
     model_formula, model_func, data, response_col_name = "suicide",
-    is_generative = FALSE, is_knn = FALSE, is_nb = FALSE, is_glmnet = FALSE,
+    is_generative = FALSE, is_knn = FALSE, is_nb = FALSE,
     symptoms_cols = NULL, n_fold = 5, ...) {
   # Ensure data is a dataframe
   if (!is.data.frame(data)) {
@@ -106,9 +106,6 @@ k_fold_cv <- function(
         pred <- predict(model, newdata = val_data, type = "response")$posterior[, 2]
       } else if (is_nb) {
         pred <- predict(model, newdata = val_data, type = "raw")[, 2]
-      } else if (is_glmnet) {
-        x <- model.matrix(model_formula, data = train_data)[, -1]
-        y <- train_data[[response_col_name]]
       } else {
         pred <- predict(model, newdata = val_data, type = "response")
       }
@@ -141,7 +138,9 @@ k_fold_cv <- function(
   return(result)
 }
 
-evaluate_test_set <- function(model, df_test, threshold, response_col_name = "suicide", is_knn = FALSE, is_generative = FALSE, is_nb = FALSE) {
+evaluate_test_set <- function(
+    model, df_test, threshold, response_col_name = "suicide",
+    is_knn = FALSE, is_generative = FALSE, is_nb = FALSE) {
   if (is_knn) {
     pred <- predict(model, newdata = df_test)
   } else {
@@ -169,42 +168,3 @@ evaluate_test_set <- function(model, df_test, threshold, response_col_name = "su
   )
   return(result)
 }
-# Load the dataset
-# data <- read.csv("your_dataset.csv")  # Load your data here
-
-# Run k-fold cross-validation
-# mean_sensitivity <- k_fold_cv(glm_model_func, data, response_col = "target_column", k = 5)
-# print(mean_sensitivity)
-
-
-# plot_interaction_exploration <- function(df_numeric,
-#                                          response_name,
-#                                          predictor_name,
-#                                          df_categ,
-#                                          interaction_name,
-#                                          colors,
-#                                          jitter_ammount,
-#                                          xlab,
-#                                          ylab) {
-#   i <- 1
-#   for (l in levels(df_categ[[interaction_name]])) {
-#     if (i == 1) {
-#       plot(
-#         jitter(df_numeric[[response_name]][df_categ[[interaction_name]] == l], jitter_ammount) ~
-#           jitter(df_numeric[[predictor_name]][df_categ[[interaction_name]] == l], jitter_ammount),
-#         col = colors[i],
-#         xlab = xlab,
-#         ylab = ylab
-#       )
-#     }
-#     else{
-#       points(
-#         jitter(df_numeric[[response_name]][df_categ[[interaction_name]] == l], jitter_ammount) ~
-#           jitter(df_numeric[[predictor_name]][df_categ[[interaction_name]] == l], jitter_ammount),
-#         col = colors[i]
-#       )
-#
-#     }
-#     i <- i + 1
-#   }
-# }
