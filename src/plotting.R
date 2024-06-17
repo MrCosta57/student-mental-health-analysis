@@ -1,4 +1,4 @@
-print_summary_custom <- function(df) {
+print_summary_custom <- function(df, method = "render") {
   print(
     dfSummary(
       df,
@@ -7,7 +7,7 @@ print_summary_custom <- function(df) {
       valid.col = FALSE,
       headings = FALSE
     ),
-    method = "render",
+    method = method,
     footnote = NA
   )
 }
