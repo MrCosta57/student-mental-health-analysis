@@ -226,7 +226,7 @@ The plots above regarding the proportions of students for each category divided 
 There are a few visible things in these visualizations:
 
 - The relative difference in suicide frequency considering the gender seems not so significant based on these data, instead, the gap is more noticeable compared with *whether only child* variable
-- It seems that the percentage of suicide in medium to large cities* is higher.
+- It seems that the percentage of suicide in medium to large cities is higher.
 - Being in a rich family leads to a higher proportion of suicide based on this dataset, even more, that being in an extremely poor family's economic condition
 - Attempting the art major seems to have a higher risk compared with liberal and science courses
 - As observed before, the percentage of positive values in the response variable is higher for the freshman category
@@ -763,7 +763,7 @@ rownames(metrics_val_total) <- str_row_names
 ```
 ```{r}
 # Sort by best sensitivity (true positive rate)
-(metrics_val_total %>% arrange(desc(sensitivity)))[, c("sensitivity", "specificity", "accuracy", "threshold")]
+(metrics_val_total %>% arrange(desc(sensitivity)))[, c("sensitivity", "auc", "specificity", "accuracy", "threshold")]
 ```
 Considering the evaluation metrics, some considerations can be stated:
 
@@ -811,5 +811,16 @@ rownames(metrics_test_total) <- str_row_names
 Considering instead the scores obtained on the test set, the situation changes a bit:
 
 - Indeed the GAM model with BIC formula reaches a very high sensitivity score
-- The model fitted on all the predictors reach almost a score similar to the previous one but maybe the overfits a bit on the data, considering this results
+- The model fitted on all the predictors reach almost a score similar to the previous one but maybe the overfits a bit on the data, considering these results
 - Impressively Naive Bayes obtain a high sensitivity score: maybe for this dataset the assumption of the independence between variables are not so incorrect
+
+
+# Conclusions
+Summarizing, this analysis highlights various aspects of the data related to the student's mental health, even in the absence of more detailed information about the students and the source of the data.
+Through exploratory data analysis, it was observed that students experiencing more severe mental symptoms are generally at a higher risk of suicidal ideation. The most significant factors influencing this risk are psychiatric symptoms and self-injurious behaviors.
+
+Additionally, some specific information such as being freshmen, females, and those from extremely poor or wealthy family backgrounds, appear to have a notable impact on the outcome variable. 
+
+In terms of modeling, a decision was made to use fewer predictors to enhance interpretability, which was considered crucial for this analysis.
+This choice may have slightly compromised accuracy, but most models achieved high sensitivity scores.
+The Generative Additive Model (GAM) emerged as the best compromise between validation and test scores. This model also indicated the presence of nonlinear patterns among the predictors, suggesting a complex interaction mainly between suicide probability and mental symptoms. If greater interpretability and less computational power are preferred, standard logistic regression or Naive Bayes classifier using a subset of predictors can be a viable alternative for this data.
