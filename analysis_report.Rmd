@@ -157,13 +157,11 @@ print_summary_custom(df, method = "pander")
 dim(df)
 # "N. of missing values:"
 sum(is.na(df))
-# "N. of duplicated rows:"
-sum(duplicated(df))
 # "Example of some objects:"
 head(df, 3)
 ```
 
-From the above table, it can be seen that all the columns have the expected format now. Also can be observed that there are no missing values but some duplicate rows are present. Duplicates in this case probably refer to students that have the same profile conditions and that have replayed in the same way to the survey for building the dataset. It's chosen to keep these rows to maintain the original dataset semantics.
+From the above table, it can be seen that all the columns have the expected format now. Also can be observed that there are no missing values.
 
 Talking about the summary of the variables, different aspects can be observed:
 
@@ -267,21 +265,8 @@ ggcorrplot(corr_matrix,
 
 The heatmap of the correlation matrix shows that all the variables are quite highly positively correlated with each other. By the plot can be seen that the most correlated variables are *impulsivity* and *compulsion* (0.72), *dependence* and *impulsivity* (0.71), *dependence* and *compulsion* (0.68). Also *self-injury behaviors* and *eating problems* seem to be correlated in a significant way (0.66).
 
-The correlation coefficient significance test is performed to check if for these features correlation is statistically significant. The formula for the t-statistic is: 
 
-$$t_c=\frac{r}{\sqrt{\frac{1-r^2}{n-2}}}= \frac{r \sqrt{n-2}}{\sqrt{1-r^2}}$$
-where \(r\) is the correlation coefficient and \(n\) is the number of observations. The null hypothesis is that the correlation coefficient is equal to zero, and the alternative hypothesis is that the correlation coefficient is not equal to zero. The degrees of freedom for the t-distribution are \(n-2\). The p-value is calculated as the probability of observing a t-statistic as extreme as the one calculated from the data, assuming the null hypothesis is true.
-
-```{r}
-cor.test(df$impulsivity, df$compulsion)
-cor.test(df$dependence, df$impulsivity)
-cor.test(df$dependence, df$compulsion)
-cor.test(df$self_injury_behaviors, df$eating_problems)
-cor.test(df$self_injury_behaviors, df$internet_addiction)
-```
-
-The p-values for the correlation tests are all very close to zero, indicating that the correlations are statistically significant.
-However, this information is not fully considered because numeric variables have all positive variables and they are almost all in the same range.
+Inspecting the correlation matrix, it seems that some variables are quite high positive correlated. however this information is not fully considered because numeric variables have all positive variables and they are almost all in the same range.
 
 
 ## Interaction terms
@@ -299,9 +284,10 @@ In particular, the following interactions are considered:
 
 ```{r}
 df$suicide <- numeric_suicide
+jitter_val <- 1
 ```
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
-ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
+ggplot(df, aes(x = jitter(psychiatric_symptoms, jitter_val), y = jitter(suicide, jitter_val), color = gender)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = gender)) +
   labs(
@@ -311,7 +297,7 @@ ggplot(df, aes(x = psychiatric_symptoms, y = suicide, color = gender)) +
   )
 ```
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
-ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)) +
+ggplot(df, aes(x = jitter(eating_problems, jitter_val), y = jitter(suicide, jitter_val), color = family_economic_status)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = family_economic_status)) +
   labs(
@@ -321,7 +307,7 @@ ggplot(df, aes(x = eating_problems, y = suicide, color = family_economic_status)
   )
 ```
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
-ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
+ggplot(df, aes(x = jitter(sleeping_disturbance, jitter_val), y = jitter(suicide, jitter_val), color = major)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = major)) +
   labs(
@@ -331,7 +317,7 @@ ggplot(df, aes(x = sleeping_disturbance, y = suicide, color = major)) +
   )
 ```
 ```{r message=FALSE, warning=FALSE, echo=FALSE}
-ggplot(df, aes(x = hostile_aggression, y = suicide, color = birth_place)) +
+ggplot(df, aes(x = jitter(hostile_aggression, jitter_val), y = jitter(suicide, jitter_val), color = birth_place)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, aes(group = birth_place)) +
   labs(

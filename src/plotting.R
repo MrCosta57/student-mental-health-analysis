@@ -66,7 +66,7 @@ plot_freq_by_category <- function(data, freq_var, binary_category) {
 }
 
 
-plot_proportion_by_category <- function(data, freq_var, binary_category) {
+plot_proportion_by_category <- function(data, freq_var, binary_category, response_value = TRUE) {
   pred_label <- NULL
   if (is.factor(data[[freq_var]])) {
     data[[freq_var]] <- factor(data[[freq_var]],
@@ -81,18 +81,24 @@ plot_proportion_by_category <- function(data, freq_var, binary_category) {
   }
 
   resp_label <- var_name_to_label(binary_category, "")
+  data <- data %>%
+    group_by(.data[[freq_var]], .data[[binary_category]]) %>%
+    summarise(freq = n()) %>%
+    mutate(ratio = freq / sum(freq) * 100)
+
+  filtered_data <- data %>% dplyr::filter(.data[[binary_category]] == response_value)
 
   p <- ggplot(
-    data %>% group_by(.data[[freq_var]], .data[[binary_category]]) %>% summarise(freq = n()) %>% mutate(ratio = freq / sum(freq)),
+    filtered_data,
     aes(x = .data[[freq_var]], y = ratio, fill = .data[[binary_category]])
   ) +
-    geom_bar(position = "fill", stat = "identity") +
-    geom_text(aes(label = scales::percent(ratio, accuracy = 0.1)),
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = paste0(round(ratio, 2), "%")),
       position =
         position_fill(vjust = 0.5)
     ) +
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5)) +
+    theme(plot.title = element_text(hjust = 0.5), legend.position = "none") +
     labs(
       title = paste(
         "Percentage of",
@@ -103,7 +109,7 @@ plot_proportion_by_category <- function(data, freq_var, binary_category) {
         sep = " "
       ),
       x = pred_label,
-      y = "Percentage",
+      y = "Percentage (%)",
       fill = resp_label
     ) +
     scale_fill_brewer(palette = "Paired")
