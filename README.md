@@ -1,5 +1,9 @@
 # Mind Matters: A Data-driven Examination of College Students' Mental Health
 
+<div style="text-align: center;">
+    <img src="assets/mental_health_cover_landscape.png" alt="repo_cover" style="width:70%">
+</div>
+
 ## Description
 This project aims to delve into the pressing issue of mental health among college students, a topic of significant importance in today's fast-paced, high-stress academic environment. The analysis seeks to provide a comprehensive understanding of the mental health landscape, by utilizing one dataset coming from a survey, with a particular focus on psychiatric symptoms and other associated health problems.
 
