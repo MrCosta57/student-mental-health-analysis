@@ -1,6 +1,6 @@
 # Mind Matters: A Data-driven Examination of College Students' Mental Health
 
-<div style="text-align: center;">
+<div align="center">
     <img src="assets/mental_health_cover_landscape.png" alt="repo_cover" style="width:70%">
 </div>
 
